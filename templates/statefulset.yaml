@@ -83,7 +83,6 @@ spec:
           {{- toYaml .Values.resources | nindent 12 }}
         {{- end }}
         env:
-          -
           - name: ITENTIAL_WEBSERVER_HTTPS_PORT
             value: {{ .Values.applicationPort | quote }}
           {{- range $key, $value := .Values.env }}

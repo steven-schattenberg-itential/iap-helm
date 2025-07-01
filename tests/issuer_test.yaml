@@ -1,0 +1,168 @@
+suite: test issuer template
+templates:
+  - issuer.yaml
+tests:
+  - it: should not render when issuer is disabled
+    set:
+      issuer.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should render Issuer when enabled with valid configuration
+    set:
+      issuer:
+        enabled: true
+        name: "ca-issuer"
+        caSecretName: "ca-key-pair"
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: Issuer
+      - isAPIVersion:
+          of: cert-manager.io/v1
+      - equal:
+          path: metadata.name
+          value: "ca-issuer"
+      - equal:
+          path: spec.ca.secretName
+          value: "ca-key-pair"
+
+  - it: should include iap labels in metadata
+    set:
+      issuer:
+        enabled: true
+        name: "test-issuer"
+        caSecretName: "test-ca-secret"
+    asserts:
+      - isSubset:
+          path: metadata.labels
+          content:
+            app.kubernetes.io/instance: RELEASE-NAME
+            app.kubernetes.io/managed-by: Helm
+            app.kubernetes.io/name: iap
+            app.kubernetes.io/version: 6.0.4
+            helm.sh/chart: iap-1.0.0
+
+  - it: should fail when issuer name is empty string
+    set:
+      issuer:
+        enabled: true
+        name: ""
+        caSecretName: "ca-key-pair"
+    asserts:
+      - failedTemplate:
+          errorMessage: "issuer.name is required when issuer is enabled"
+
+  - it: should fail when caSecretName is empty string
+    set:
+      issuer:
+        enabled: true
+        name: "test-issuer"
+        caSecretName: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: "issuer.caSecretName is required when issuer is enabled"
+
+  - it: should handle different issuer names
+    set:
+      issuer:
+        enabled: true
+        name: "internal-ca-issuer"
+        caSecretName: "internal-ca-secret"
+    asserts:
+      - equal:
+          path: metadata.name
+          value: "internal-ca-issuer"
+      - equal:
+          path: spec.ca.secretName
+          value: "internal-ca-secret"
+
+  - it: should handle different CA secret names
+    set:
+      issuer:
+        enabled: true
+        name: "production-issuer"
+        caSecretName: "production-ca-keypair"
+    asserts:
+      - equal:
+          path: metadata.name
+          value: "production-issuer"
+      - equal:
+          path: spec.ca.secretName
+          value: "production-ca-keypair"
+
+  - it: should properly quote issuer name with special characters
+    set:
+      issuer:
+        enabled: true
+        name: "my-ca-issuer-2024"
+        caSecretName: "my-ca-secret-2024"
+    asserts:
+      - equal:
+          path: metadata.name
+          value: "my-ca-issuer-2024"
+      - equal:
+          path: spec.ca.secretName
+          value: "my-ca-secret-2024"
+
+  - it: should handle namespace-specific naming
+    set:
+      issuer:
+        enabled: true
+        name: "staging-ca-issuer"
+        caSecretName: "staging-ca-root"
+    asserts:
+      - equal:
+          path: metadata.name
+          value: "staging-ca-issuer"
+      - equal:
+          path: spec.ca.secretName
+          value: "staging-ca-root"
+
+  - it: should render with minimal valid configuration
+    set:
+      issuer:
+        enabled: true
+        name: "minimal"
+        caSecretName: "minimal-ca"
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: Issuer
+      - equal:
+          path: metadata.name
+          value: "minimal"
+      - equal:
+          path: spec.ca.secretName
+          value: "minimal-ca"
+
+  - it: should handle long issuer names
+    set:
+      issuer:
+        enabled: true
+        name: "very-long-issuer-name-for-testing-purposes"
+        caSecretName: "very-long-ca-secret-name-for-testing"
+    asserts:
+      - equal:
+          path: metadata.name
+          value: "very-long-issuer-name-for-testing-purposes"
+      - equal:
+          path: spec.ca.secretName
+          value: "very-long-ca-secret-name-for-testing"
+
+  - it: should validate spec structure
+    set:
+      issuer:
+        enabled: true
+        name: "structure-test"
+        caSecretName: "structure-ca"
+    asserts:
+      - exists:
+          path: spec.ca
+      - exists:
+          path: spec.ca.secretName
+      - isNotNull:
+          path: spec.ca.secretName

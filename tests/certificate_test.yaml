@@ -1,0 +1,229 @@
+suite: test certificate template
+templates:
+  - certificate.yaml
+tests:
+  - it: should not render when certificate is disabled
+    set:
+      certificate.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should render Certificate when enabled with default values
+    set:
+      certificate:
+        enabled: true
+        hostname: "example.com"
+        issuerRef:
+          name: "letsencrypt-prod"
+          kind: "ClusterIssuer"
+        renewBefore: "720h"
+        duration: "2160h"
+      nameOverride: "test-app"
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: Certificate
+      - isAPIVersion:
+          of: cert-manager.io/v1
+      - equal:
+          path: metadata.name
+          value: "RELEASE-NAME-test-app-tls"
+      - equal:
+          path: spec.secretName
+          value: "RELEASE-NAME-test-app-tls-secret"
+      - equal:
+          path: spec.issuerRef.name
+          value: "letsencrypt-prod"
+      - equal:
+          path: spec.issuerRef.kind
+          value: "ClusterIssuer"
+      - equal:
+          path: spec.commonName
+          value: "example.com"
+      - equal:
+          path: spec.dnsNames[0]
+          value: "example.com"
+      - equal:
+          path: spec.renewBefore
+          value: "720h"
+      - equal:
+          path: spec.duration
+          value: "2160h"
+
+  - it: should include iap labels in metadata
+    set:
+      certificate:
+        enabled: true
+        hostname: "test.example.com"
+        issuerRef:
+          name: "test-issuer"
+          kind: "Issuer"
+        renewBefore: "720h"
+        duration: "2160h"
+    asserts:
+      - isSubset:
+          path: metadata.labels
+          content:
+            app.kubernetes.io/instance: RELEASE-NAME
+            app.kubernetes.io/managed-by: Helm
+            app.kubernetes.io/name: iap
+            app.kubernetes.io/version: 6.0.4
+            helm.sh/chart: iap-1.0.0
+
+  - it: should handle different issuer types
+    set:
+      certificate:
+        enabled: true
+        hostname: "api.example.com"
+        issuerRef:
+          name: "ca-issuer"
+          kind: "Issuer"
+        renewBefore: "168h"
+        duration: "8760h"
+    asserts:
+      - equal:
+          path: spec.issuerRef.name
+          value: "ca-issuer"
+      - equal:
+          path: spec.issuerRef.kind
+          value: "Issuer"
+      - equal:
+          path: spec.commonName
+          value: "api.example.com"
+      - equal:
+          path: spec.dnsNames[0]
+          value: "api.example.com"
+
+  - it: should handle ClusterIssuer
+    set:
+      certificate:
+        enabled: true
+        hostname: "secure.example.com"
+        issuerRef:
+          name: "letsencrypt-staging"
+          kind: "ClusterIssuer"
+        renewBefore: "360h"
+        duration: "1440h"
+    asserts:
+      - equal:
+          path: spec.issuerRef.name
+          value: "letsencrypt-staging"
+      - equal:
+          path: spec.issuerRef.kind
+          value: "ClusterIssuer"
+
+  - it: should handle different renewal and duration settings
+    set:
+      certificate:
+        enabled: true
+        hostname: "short-lived.example.com"
+        issuerRef:
+          name: "test-issuer"
+          kind: "Issuer"
+        renewBefore: "24h"
+        duration: "168h"
+    asserts:
+      - equal:
+          path: spec.renewBefore
+          value: "24h"
+      - equal:
+          path: spec.duration
+          value: "168h"
+
+  - it: should handle wildcard certificates
+    set:
+      certificate:
+        enabled: true
+        hostname: "*.example.com"
+        issuerRef:
+          name: "dns-issuer"
+          kind: "ClusterIssuer"
+        renewBefore: "720h"
+        duration: "2160h"
+    asserts:
+      - equal:
+          path: spec.commonName
+          value: "*.example.com"
+      - equal:
+          path: spec.dnsNames[0]
+          value: "*.example.com"
+
+  - it: should use fullname template for naming
+    set:
+      certificate:
+        enabled: true
+        hostname: "test.example.com"
+        issuerRef:
+          name: "test-issuer"
+          kind: "Issuer"
+        renewBefore: "720h"
+        duration: "2160h"
+      fullnameOverride: "custom-app-name"
+    asserts:
+      - equal:
+          path: metadata.name
+          value: "custom-app-name-tls"
+      - equal:
+          path: spec.secretName
+          value: "custom-app-name-tls-secret"
+
+  - it: should handle special characters in hostname
+    set:
+      certificate:
+        enabled: true
+        hostname: "test-app.staging.example.com"
+        issuerRef:
+          name: "staging-issuer"
+          kind: "ClusterIssuer"
+        renewBefore: "720h"
+        duration: "2160h"
+    asserts:
+      - equal:
+          path: spec.commonName
+          value: "test-app.staging.example.com"
+      - equal:
+          path: spec.dnsNames[0]
+          value: "test-app.staging.example.com"
+
+  - it: should handle long duration certificates
+    set:
+      certificate:
+        enabled: true
+        hostname: "long-term.example.com"
+        issuerRef:
+          name: "ca-issuer"
+          kind: "Issuer"
+        renewBefore: "8760h"
+        duration: "87600h"
+    asserts:
+      - equal:
+          path: spec.renewBefore
+          value: "8760h"
+      - equal:
+          path: spec.duration
+          value: "87600h"
+
+  - it: should handle different chart names
+    set:
+      certificate:
+        enabled: true
+        hostname: "chart-test.example.com"
+        issuerRef:
+          name: "test-issuer"
+          kind: "Issuer"
+        renewBefore: "720h"
+        duration: "2160h"
+      nameOverride: ""
+      fullnameOverride: ""
+    chart:
+      name: "my-custom-chart"
+      version: "1.0.0"
+    asserts:
+      - matchRegex:
+          path: metadata.name
+          pattern: ".*-tls$"
+      - matchRegex:
+          path: spec.secretName
+          pattern: ".*-tls-secret$"

@@ -1,0 +1,643 @@
+suite: test statefulset template
+templates:
+  - statefulset.yaml
+tests:
+  - it: should not render when statefulset is disabled
+    set:
+      statefulset.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should render StatefulSet with basic configuration
+    set:
+      statefulset.enabled: true
+      replicaCount: 3
+      image:
+        repository: "itential/iap"
+        tag: "latest"
+        pullPolicy: "Always"
+      service:
+        port: 8080
+      applicationPort: 8080
+      useTLS: false
+      podSecurityContext: {}
+      securityContext: {}
+      persistentVolumeClaims:
+        enabled: false
+    chart:
+      name: "iap"
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: StatefulSet
+      - isAPIVersion:
+          of: apps/v1
+      - equal:
+          path: spec.serviceName
+          value: "iap-service"
+      - equal:
+          path: spec.replicas
+          value: 3
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: "iap"
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: "itential/iap:latest"
+      - equal:
+          path: spec.template.spec.containers[0].imagePullPolicy
+          value: "Always"
+
+  - it: should include iap labels in metadata and template
+    set:
+      statefulset.enabled: true
+      replicaCount: 1
+      image:
+        repository: "test/app"
+        tag: "v1.0.0"
+        pullPolicy: "IfNotPresent"
+      service:
+        port: 80
+      applicationPort: 8080
+      useTLS: false
+      podSecurityContext: {}
+      securityContext: {}
+      persistentVolumeClaims:
+        enabled: false
+    asserts:
+      - isSubset:
+          path: metadata.labels
+          content:
+            app.kubernetes.io/instance: RELEASE-NAME
+            app.kubernetes.io/managed-by: Helm
+            app.kubernetes.io/name: iap
+            app.kubernetes.io/version: 6.0.4
+            helm.sh/chart: iap-1.0.0
+      - isSubset:
+          path: spec.template.metadata.labels
+          content:
+            app.kubernetes.io/instance: RELEASE-NAME
+            app.kubernetes.io/managed-by: Helm
+            app.kubernetes.io/name: iap
+            app.kubernetes.io/version: 6.0.4
+            helm.sh/chart: iap-1.0.0
+
+  - it: should include selector labels
+    set:
+      statefulset.enabled: true
+      replicaCount: 1
+      image:
+        repository: "test/app"
+        tag: "v1.0.0"
+        pullPolicy: "IfNotPresent"
+      service:
+        port: 80
+      applicationPort: 8080
+      useTLS: false
+      podSecurityContext: {}
+      securityContext: {}
+      persistentVolumeClaims:
+        enabled: false
+    asserts:
+      - isSubset:
+          path: spec.selector.matchLabels
+          content:
+            app.kubernetes.io/name: iap
+            app.kubernetes.io/instance: RELEASE-NAME
+
+  - it: should handle pod annotations
+    set:
+      statefulset.enabled: true
+      replicaCount: 1
+      image:
+        repository: "test/app"
+        tag: "v1.0.0"
+        pullPolicy: "IfNotPresent"
+      service:
+        port: 80
+      applicationPort: 8080
+      useTLS: false
+      podSecurityContext: {}
+      securityContext: {}
+      persistentVolumeClaims:
+        enabled: false
+      podAnnotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        custom.annotation: "test-value"
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations["prometheus.io/scrape"]
+          value: "true"
+      - equal:
+          path: spec.template.metadata.annotations["prometheus.io/port"]
+          value: "8080"
+      - equal:
+          path: spec.template.metadata.annotations["custom.annotation"]
+          value: "test-value"
+
+  - it: should handle pod labels
+    set:
+      statefulset.enabled: true
+      replicaCount: 1
+      image:
+        repository: "test/app"
+        tag: "v1.0.0"
+        pullPolicy: "IfNotPresent"
+      service:
+        port: 80
+      applicationPort: 8080
+      useTLS: false
+      podSecurityContext: {}
+      securityContext: {}
+      persistentVolumeClaims:
+        enabled: false
+      podLabels:
+        environment: "production"
+        tier: "backend"
+    asserts:
+      - equal:
+          path: spec.template.metadata.labels.environment
+          value: "production"
+      - equal:
+          path: spec.template.metadata.labels.tier
+          value: "backend"
+
+  - it: should handle image pull secrets
+    set:
+      statefulset.enabled: true
+      replicaCount: 1
+      image:
+        repository: "private/app"
+        tag: "v1.0.0"
+        pullPolicy: "IfNotPresent"
+      service:
+        port: 80
+      applicationPort: 8080
+      useTLS: false
+      podSecurityContext: {}
+      securityContext: {}
+      persistentVolumeClaims:
+        enabled: false
+      imagePullSecrets:
+        - name: "docker-registry-secret"
+        - name: "private-registry-secret"
+    asserts:
+      - equal:
+          path: spec.template.spec.imagePullSecrets[0].name
+          value: "docker-registry-secret"
+      - equal:
+          path: spec.template.spec.imagePullSecrets[1].name
+          value: "private-registry-secret"
+
+  - it: should configure environment variables
+    set:
+      statefulset.enabled: true
+      replicaCount: 1
+      image:
+        repository: "test/app"
+        tag: "v1.0.0"
+        pullPolicy: "IfNotPresent"
+      service:
+        port: 80
+      applicationPort: 8443
+      useTLS: false
+      podSecurityContext: {}
+      securityContext: {}
+      persistentVolumeClaims:
+        enabled: false
+      env:
+        NODE_ENV: "production"
+        API_KEY: "secret-key"
+        DEBUG: "false"
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].env[0].name
+          value: "ITENTIAL_WEBSERVER_HTTPS_PORT"
+      - equal:
+          path: spec.template.spec.containers[0].env[0].value
+          value: "8443"
+      - lengthEqual:
+          path: spec.template.spec.containers[0].env
+          count: 78
+
+  - it: should configure startup probe when enabled
+    set:
+      statefulset.enabled: true
+      replicaCount: 1
+      image:
+        repository: "test/app"
+        tag: "v1.0.0"
+        pullPolicy: "IfNotPresent"
+      service:
+        port: 80
+      applicationPort: 8080
+      useTLS: false
+      podSecurityContext: {}
+      securityContext: {}
+      persistentVolumeClaims:
+        enabled: false
+      startupProbe:
+        enabled: true
+        path: "/health/startup"
+        failureThreshold: 30
+        initialDelaySeconds: 30
+        periodSeconds: 10
+        successThreshold: 1
+        timeoutSeconds: 5
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].startupProbe.httpGet.path
+          value: "/health/startup"
+      - equal:
+          path: spec.template.spec.containers[0].startupProbe.httpGet.port
+          value: 8080
+      - equal:
+          path: spec.template.spec.containers[0].startupProbe.httpGet.scheme
+          value: "HTTP"
+      - equal:
+          path: spec.template.spec.containers[0].startupProbe.failureThreshold
+          value: 30
+      - equal:
+          path: spec.template.spec.containers[0].startupProbe.initialDelaySeconds
+          value: 30
+
+  - it: should configure liveness probe when enabled
+    set:
+      statefulset.enabled: true
+      replicaCount: 1
+      image:
+        repository: "test/app"
+        tag: "v1.0.0"
+        pullPolicy: "IfNotPresent"
+      service:
+        port: 80
+      applicationPort: 8080
+      useTLS: false
+      podSecurityContext: {}
+      securityContext: {}
+      persistentVolumeClaims:
+        enabled: false
+      livenessProbe:
+        enabled: true
+        path: "/health/live"
+        failureThreshold: 5
+        periodSeconds: 30
+        successThreshold: 1
+        timeoutSeconds: 10
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.httpGet.path
+          value: "/health/live"
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.httpGet.port
+          value: 8080
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.failureThreshold
+          value: 5
+
+  - it: should configure readiness probe when enabled
+    set:
+      statefulset.enabled: true
+      replicaCount: 1
+      image:
+        repository: "test/app"
+        tag: "v1.0.0"
+        pullPolicy: "IfNotPresent"
+      service:
+        port: 80
+      applicationPort: 8080
+      useTLS: false
+      podSecurityContext: {}
+      securityContext: {}
+      persistentVolumeClaims:
+        enabled: false
+      readinessProbe:
+        enabled: true
+        path: "/health/ready"
+        failureThreshold: 3
+        periodSeconds: 10
+        successThreshold: 1
+        timeoutSeconds: 5
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.path
+          value: "/health/ready"
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.port
+          value: 8080
+
+  - it: should use HTTPS scheme when TLS is enabled
+    set:
+      statefulset.enabled: true
+      replicaCount: 1
+      image:
+        repository: "test/app"
+        tag: "v1.0.0"
+        pullPolicy: "IfNotPresent"
+      service:
+        port: 443
+      applicationPort: 8443
+      useTLS: true
+      podSecurityContext: {}
+      securityContext: {}
+      persistentVolumeClaims:
+        enabled: false
+      startupProbe:
+        enabled: true
+        path: "/health"
+        failureThreshold: 30
+        initialDelaySeconds: 30
+        periodSeconds: 10
+        successThreshold: 1
+        timeoutSeconds: 5
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].startupProbe.httpGet.scheme
+          value: "HTTPS"
+
+  - it: should configure TLS volumes and mounts when enabled
+    set:
+      statefulset.enabled: true
+      replicaCount: 1
+      image:
+        repository: "test/app"
+        tag: "v1.0.0"
+        pullPolicy: "IfNotPresent"
+      service:
+        port: 443
+      applicationPort: 8443
+      useTLS: true
+      podSecurityContext: {}
+      securityContext: {}
+      persistentVolumeClaims:
+        enabled: false
+      nameOverride: "test-app"
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: platform-cert-volume
+            secret:
+              secretName: RELEASE-NAME-test-app-tls-secret
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: platform-cert-volume
+            mountPath: /etc/ssl/certs/platform/server.crt
+            subPath: tls.crt
+            readOnly: true
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: platform-cert-volume
+            mountPath: /etc/ssl/certs/platform/server.key
+            subPath: tls.key
+            readOnly: true
+
+  - it: should configure resources when provided
+    set:
+      statefulset.enabled: true
+      replicaCount: 1
+      image:
+        repository: "test/app"
+        tag: "v1.0.0"
+        pullPolicy: "IfNotPresent"
+      service:
+        port: 80
+      applicationPort: 8080
+      useTLS: false
+      podSecurityContext: {}
+      securityContext: {}
+      persistentVolumeClaims:
+        enabled: false
+      resources:
+        requests:
+          memory: "256Mi"
+          cpu: "100m"
+        limits:
+          memory: "512Mi"
+          cpu: "500m"
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].resources.requests.memory
+          value: "256Mi"
+      - equal:
+          path: spec.template.spec.containers[0].resources.requests.cpu
+          value: "100m"
+      - equal:
+          path: spec.template.spec.containers[0].resources.limits.memory
+          value: "512Mi"
+      - equal:
+          path: spec.template.spec.containers[0].resources.limits.cpu
+          value: "500m"
+
+  - it: should configure volume claim templates when PVC enabled
+    set:
+      statefulset.enabled: true
+      replicaCount: 1
+      image:
+        repository: "test/app"
+        tag: "v1.0.0"
+        pullPolicy: "IfNotPresent"
+      service:
+        port: 80
+      applicationPort: 8080
+      useTLS: false
+      podSecurityContext: {}
+      securityContext: {}
+      persistentVolumeClaims:
+        enabled: true
+        assetClaim:
+          storage: "10Gi"
+        logClaim:
+          storage: "5Gi"
+      storageClass:
+        name: "fast-ssd"
+    asserts:
+      - equal:
+          path: spec.volumeClaimTemplates[0].metadata.name
+          value: "iap-assets-volume"
+      - equal:
+          path: spec.volumeClaimTemplates[0].spec.accessModes[0]
+          value: "ReadWriteOnce"
+      - equal:
+          path: spec.volumeClaimTemplates[0].spec.resources.requests.storage
+          value: "10Gi"
+      - equal:
+          path: spec.volumeClaimTemplates[0].spec.storageClassName
+          value: "fast-ssd"
+      - equal:
+          path: spec.volumeClaimTemplates[1].metadata.name
+          value: "iap-logs-volume"
+      - equal:
+          path: spec.volumeClaimTemplates[1].spec.resources.requests.storage
+          value: "5Gi"
+
+  - it: should handle node selector
+    set:
+      statefulset.enabled: true
+      replicaCount: 1
+      image:
+        repository: "test/app"
+        tag: "v1.0.0"
+        pullPolicy: "IfNotPresent"
+      service:
+        port: 80
+      applicationPort: 8080
+      useTLS: false
+      podSecurityContext: {}
+      securityContext: {}
+      persistentVolumeClaims:
+        enabled: false
+      nodeSelector:
+        disktype: "ssd"
+        kubernetes.io/arch: "amd64"
+    asserts:
+      - equal:
+          path: spec.template.spec.nodeSelector.disktype
+          value: "ssd"
+      - equal:
+          path: spec.template.spec.nodeSelector["kubernetes.io/arch"]
+          value: "amd64"
+
+  - it: should handle affinity rules
+    set:
+      statefulset.enabled: true
+      replicaCount: 1
+      image:
+        repository: "test/app"
+        tag: "v1.0.0"
+        pullPolicy: "IfNotPresent"
+      service:
+        port: 80
+      applicationPort: 8080
+      useTLS: false
+      podSecurityContext: {}
+      securityContext: {}
+      persistentVolumeClaims:
+        enabled: false
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app
+                    operator: In
+                    values:
+                      - test-app
+              topologyKey: kubernetes.io/hostname
+    asserts:
+      - exists:
+          path: spec.template.spec.affinity.podAntiAffinity
+
+  - it: should handle tolerations
+    set:
+      statefulset.enabled: true
+      replicaCount: 1
+      image:
+        repository: "test/app"
+        tag: "v1.0.0"
+        pullPolicy: "IfNotPresent"
+      service:
+        port: 80
+      applicationPort: 8080
+      useTLS: false
+      podSecurityContext: {}
+      securityContext: {}
+      persistentVolumeClaims:
+        enabled: false
+      tolerations:
+        - key: "node-role.kubernetes.io/master"
+          operator: "Exists"
+          effect: "NoSchedule"
+        - key: "dedicated"
+          operator: "Equal"
+          value: "database"
+          effect: "NoSchedule"
+    asserts:
+      - equal:
+          path: spec.template.spec.tolerations[0].key
+          value: "node-role.kubernetes.io/master"
+      - equal:
+          path: spec.template.spec.tolerations[0].operator
+          value: "Exists"
+      - equal:
+          path: spec.template.spec.tolerations[1].key
+          value: "dedicated"
+      - equal:
+          path: spec.template.spec.tolerations[1].value
+          value: "database"
+
+  - it: should handle custom volumes and volume mounts
+    set:
+      statefulset.enabled: true
+      replicaCount: 1
+      image:
+        repository: "test/app"
+        tag: "v1.0.0"
+        pullPolicy: "IfNotPresent"
+      service:
+        port: 80
+      applicationPort: 8080
+      useTLS: false
+      podSecurityContext: {}
+      securityContext: {}
+      persistentVolumeClaims:
+        enabled: false
+      volumes:
+        - name: "config-volume"
+          configMap:
+            name: "app-config"
+        - name: "secret-volume"
+          secret:
+            secretName: "app-secrets"
+      volumeMounts:
+        - name: "config-volume"
+          mountPath: "/etc/config"
+        - name: "secret-volume"
+          mountPath: "/etc/secrets"
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: "config-volume"
+            configMap:
+              name: "app-config"
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: "config-volume"
+            mountPath: "/etc/config"
+
+  - it: should not render probes when disabled
+    set:
+      statefulset.enabled: true
+      replicaCount: 1
+      image:
+        repository: "test/app"
+        tag: "v1.0.0"
+        pullPolicy: "IfNotPresent"
+      service:
+        port: 80
+      applicationPort: 8080
+      useTLS: false
+      podSecurityContext: {}
+      securityContext: {}
+      persistentVolumeClaims:
+        enabled: false
+      startupProbe:
+        enabled: false
+      livenessProbe:
+        enabled: false
+      readinessProbe:
+        enabled: false
+    asserts:
+      - isNull:
+          path: spec.template.spec.containers[0].startupProbe
+      - isNull:
+          path: spec.template.spec.containers[0].livenessProbe
+      - isNull:
+          path: spec.template.spec.containers[0].readinessProbe
