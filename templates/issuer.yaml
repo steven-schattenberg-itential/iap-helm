@@ -1,0 +1,21 @@
+{{- if .Values.issuer.enabled -}}
+{{- if not .Values.issuer.name -}}
+{{- fail "issuer.name is required when issuer is enabled" -}}
+{{- end -}}
+{{- if not .Values.issuer.caSecretName -}}
+{{- fail "issuer.caSecretName is required when issuer is enabled" -}}
+{{- end -}}
+# Copyright (c) 2025, Itential, Inc
+# GNU General Public License v3.0+ (see LICENSE or https://www.gnu.org/licenses/gpl-3.0.txt)
+# Source: iap-helm/templates/issuer.yaml
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ .Values.issuer.name | quote }}
+  labels:
+    {{- include "iap.labels" . | nindent 4 }}
+spec:
+  ca:
+    secretName: {{ .Values.issuer.caSecretName | quote }}
+{{- end -}}
