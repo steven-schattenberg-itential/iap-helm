@@ -1,0 +1,159 @@
+{{- if .Values.statefulset.enabled -}}
+# Copyright (c) 2024, Itential, Inc
+# GNU General Public License v3.0+ (see LICENSE or https://www.gnu.org/licenses/gpl-3.0.txt)
+# Source: iap/templates/statefulset.yaml
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name:  {{ include "iap.fullname" . }}
+  labels:
+    {{- include "iap.labels" . | nindent 4 }}
+spec:
+  serviceName: "iap-service"
+  selector:
+    matchLabels:
+      {{- include "iap.selectorLabels" . | nindent 6 }}
+  replicas: {{ .Values.replicaCount }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "iap.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: ""
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+      - name: {{ .Chart.Name }}
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 12 }}
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+          - name: http
+            containerPort: {{ .Values.service.port }}
+            protocol: TCP
+        {{- if .Values.startupProbe.enabled }}
+        startupProbe:
+          failureThreshold: {{ .Values.startupProbe.failureThreshold }}
+          httpGet:
+            path: {{ .Values.startupProbe.path }}
+            port: {{ .Values.applicationPort }}
+            scheme: {{ ternary "HTTPS" "HTTP" .Values.useTLS }}
+          initialDelaySeconds: {{ .Values.startupProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.startupProbe.periodSeconds }}
+          successThreshold: {{ .Values.startupProbe.successThreshold }}
+          timeoutSeconds: {{ .Values.startupProbe.timeoutSeconds }}
+        {{- end }}
+        {{- if .Values.livenessProbe.enabled }}
+        livenessProbe:
+          failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
+          httpGet:
+            path: {{ .Values.livenessProbe.path }}
+            port: {{ .Values.applicationPort }}
+            scheme: {{ ternary "HTTPS" "HTTP" .Values.useTLS }}
+          periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+          successThreshold: {{ .Values.livenessProbe.successThreshold }}
+          timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
+        {{- end }}
+        {{- if .Values.readinessProbe.enabled }}
+        readinessProbe:
+          failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
+          httpGet:
+            path: {{ .Values.readinessProbe.path }}
+            port: {{ .Values.applicationPort }}
+            scheme: {{ ternary "HTTPS" "HTTP" .Values.useTLS }}
+          periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+          successThreshold: {{ .Values.readinessProbe.successThreshold }}
+          timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds }}
+        {{- end }}
+        {{- if .Values.resources }}
+        resources:
+          {{- toYaml .Values.resources | nindent 12 }}
+        {{- end }}
+        env:
+          -
+          - name: ITENTIAL_WEBSERVER_HTTPS_PORT
+            value: {{ .Values.applicationPort | quote }}
+          {{- range $key, $value := .Values.env }}
+          - name: {{ $key }}
+            value: {{ $value | quote }}
+          {{- end }}
+        volumeMounts:
+          {{- if .Values.useTLS }}
+          - name: platform-cert-volume
+            mountPath: /etc/ssl/certs/platform/server.crt
+            subPath: tls.crt
+            readOnly: true
+          - name: platform-cert-volume
+            mountPath: /etc/ssl/certs/platform/server.key
+            subPath: tls.key
+            readOnly: true
+          - name: platform-cert-volume
+            mountPath: /etc/ssl/certs/platform/ca-bundle.crt
+            subPath: ca.crt
+            readOnly: true
+          {{- end }}
+          # Uses a persistent volume claim to mount a directory to write IAP log files to
+          - name: "iap-logs-volume"
+            mountPath: "/var/log/itential"
+          # Uses a persistent volume claim to mount a directory that includes adapters and apps
+          - name: "iap-assets-volume"
+            mountPath: "/opt/custom"
+        {{- with .Values.volumeMounts }}
+        {{- toYaml . | nindent 10 }}
+        {{- end }}
+      volumes:
+        {{- if .Values.useTLS }}
+        - name: platform-cert-volume
+          secret:
+            secretName: {{ include "iap.fullname" . }}-tls-secret
+        {{- end }}
+      {{- with .Values.volumes }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  {{- if .Values.persistentVolumeClaims.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: "iap-assets-volume"
+      spec:
+        accessModes:
+          - "ReadWriteOnce"
+        resources:
+          requests:
+            storage: {{ .Values.persistentVolumeClaims.assetClaim.storage }}
+        storageClassName: {{ .Values.storageClass.name }}
+    - metadata:
+        name: "iap-logs-volume"
+      spec:
+        accessModes:
+          - "ReadWriteOnce"
+        resources:
+          requests:
+            storage: {{ .Values.persistentVolumeClaims.logClaim.storage }}
+        storageClassName: {{ .Values.storageClass.name }}
+  {{- end }}
+{{- end }}
