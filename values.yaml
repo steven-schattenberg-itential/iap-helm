@@ -432,13 +432,13 @@ env:
   ITENTIAL_WEBSERVER_HTTPS_ENABLED: "true"
 
   # The path to the public key file used for HTTPS connections.
-  # ITENTIAL_WEBSERVER_HTTPS_KEY: "/opt/itential/platform/keys/itential.key"
+  # ITENTIAL_WEBSERVER_HTTPS_KEY: "/etc/ssl/certs/platform/server.key"
 
   # The passphrase for the private key used to enable TLS sessions.
   # ITENTIAL_WEBSERVER_HTTPS_PASSPHRASE: ""
 
   # The path to the certificate file used for HTTPS connections.
-  # ITENTIAL_WEBSERVER_HTTPS_CERT: "/opt/itential/platform/keys/itential.crt"
+  # ITENTIAL_WEBSERVER_HTTPS_CERT: "/etc/ssl/certs/platform/server.crt"
 
   # The set of allowed SSL/TLS protocol versions.
   ITENTIAL_WEBSERVER_HTTPS_SECURE_PROTOCOL: "TLSv1_2_method"
