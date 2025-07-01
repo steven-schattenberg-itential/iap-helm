@@ -1,0 +1,304 @@
+suite: test service template
+templates:
+  - service.yaml
+tests:
+  - it: should render Service with default configuration
+    set:
+      service:
+        name: "test-service"
+        type: "ClusterIP"
+        port: 80
+      applicationPort: 8080
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: Service
+      - isAPIVersion:
+          of: v1
+      - equal:
+          path: metadata.name
+          value: "test-service"
+      - equal:
+          path: spec.type
+          value: "ClusterIP"
+      - equal:
+          path: spec.ports[0].name
+          value: "http"
+      - equal:
+          path: spec.ports[0].port
+          value: 80
+      - equal:
+          path: spec.ports[0].targetPort
+          value: 8080
+      - equal:
+          path: spec.ports[0].protocol
+          value: "TCP"
+
+  - it: should include iap labels in metadata
+    set:
+      service:
+        name: "labeled-service"
+        type: "ClusterIP"
+        port: 80
+      applicationPort: 8080
+    asserts:
+      - isSubset:
+          path: metadata.labels
+          content:
+            app.kubernetes.io/instance: RELEASE-NAME
+            app.kubernetes.io/managed-by: Helm
+            app.kubernetes.io/name: iap
+            app.kubernetes.io/version: 6.0.4
+            helm.sh/chart: iap-1.0.0
+
+  - it: should include selector labels
+    set:
+      service:
+        name: "selector-service"
+        type: "ClusterIP"
+        port: 80
+      applicationPort: 8080
+      nameOverride: "test-app"
+    asserts:
+      - isSubset:
+          path: spec.selector
+          content:
+            app.kubernetes.io/name: test-app
+            app.kubernetes.io/instance: RELEASE-NAME
+
+  - it: should handle LoadBalancer service type
+    set:
+      service:
+        name: "lb-service"
+        type: "LoadBalancer"
+        port: 443
+      applicationPort: 8443
+    asserts:
+      - equal:
+          path: spec.type
+          value: "LoadBalancer"
+      - equal:
+          path: spec.ports[0].port
+          value: 443
+      - equal:
+          path: spec.ports[0].targetPort
+          value: 8443
+
+  - it: should handle NodePort service type
+    set:
+      service:
+        name: "nodeport-service"
+        type: "NodePort"
+        port: 80
+      applicationPort: 3000
+    asserts:
+      - equal:
+          path: spec.type
+          value: "NodePort"
+      - equal:
+          path: spec.ports[0].port
+          value: 80
+      - equal:
+          path: spec.ports[0].targetPort
+          value: 3000
+
+  - it: should handle different port configurations
+    set:
+      service:
+        name: "custom-port-service"
+        type: "ClusterIP"
+        port: 9090
+      applicationPort: 9000
+    asserts:
+      - equal:
+          path: spec.ports[0].port
+          value: 9090
+      - equal:
+          path: spec.ports[0].targetPort
+          value: 9000
+
+  - it: should handle same port and targetPort
+    set:
+      service:
+        name: "same-port-service"
+        type: "ClusterIP"
+        port: 8080
+      applicationPort: 8080
+    asserts:
+      - equal:
+          path: spec.ports[0].port
+          value: 8080
+      - equal:
+          path: spec.ports[0].targetPort
+          value: 8080
+
+  - it: should handle standard HTTP port
+    set:
+      service:
+        name: "http-service"
+        type: "ClusterIP"
+        port: 80
+      applicationPort: 80
+    asserts:
+      - equal:
+          path: spec.ports[0].port
+          value: 80
+      - equal:
+          path: spec.ports[0].targetPort
+          value: 80
+      - equal:
+          path: spec.ports[0].name
+          value: "http"
+
+  - it: should handle standard HTTPS port
+    set:
+      service:
+        name: "https-service"
+        type: "ClusterIP"
+        port: 443
+      applicationPort: 8443
+    asserts:
+      - equal:
+          path: spec.ports[0].port
+          value: 443
+      - equal:
+          path: spec.ports[0].targetPort
+          value: 8443
+      - equal:
+          path: spec.ports[0].name
+          value: "http"
+
+  - it: should handle high port numbers
+    set:
+      service:
+        name: "high-port-service"
+        type: "ClusterIP"
+        port: 32000
+      applicationPort: 31000
+    asserts:
+      - equal:
+          path: spec.ports[0].port
+          value: 32000
+      - equal:
+          path: spec.ports[0].targetPort
+          value: 31000
+
+  - it: should always use TCP protocol
+    set:
+      service:
+        name: "protocol-service"
+        type: "ClusterIP"
+        port: 80
+      applicationPort: 8080
+    asserts:
+      - equal:
+          path: spec.ports[0].protocol
+          value: "TCP"
+
+  - it: should always name port as http
+    set:
+      service:
+        name: "port-name-service"
+        type: "ClusterIP"
+        port: 9999
+      applicationPort: 8888
+    asserts:
+      - equal:
+          path: spec.ports[0].name
+          value: "http"
+
+  - it: should handle ExternalName service type
+    set:
+      service:
+        name: "external-service"
+        type: "ExternalName"
+        port: 80
+      applicationPort: 8080
+    asserts:
+      - equal:
+          path: spec.type
+          value: "ExternalName"
+
+  - it: should work with fullnameOverride
+    set:
+      service:
+        name: "override-test-service"
+        type: "ClusterIP"
+        port: 80
+      applicationPort: 8080
+      fullnameOverride: "custom-app-name"
+    asserts:
+      - equal:
+          path: metadata.name
+          value: "override-test-service"
+      - isSubset:
+          path: spec.selector
+          content:
+            app.kubernetes.io/name: iap
+            app.kubernetes.io/instance: RELEASE-NAME
+
+  - it: should work with nameOverride
+    set:
+      service:
+        name: "name-override-service"
+        type: "ClusterIP"
+        port: 80
+      applicationPort: 8080
+      nameOverride: "custom-name"
+    asserts:
+      - equal:
+          path: metadata.name
+          value: "name-override-service"
+
+  - it: should validate port structure
+    set:
+      service:
+        name: "structure-service"
+        type: "ClusterIP"
+        port: 80
+      applicationPort: 8080
+    asserts:
+      - exists:
+          path: spec.ports
+      - lengthEqual:
+          path: spec.ports
+          count: 1
+      - exists:
+          path: spec.ports[0].name
+      - exists:
+          path: spec.ports[0].port
+      - exists:
+          path: spec.ports[0].targetPort
+      - exists:
+          path: spec.ports[0].protocol
+
+  - it: should handle string targetPort
+    set:
+      service:
+        name: "string-port-service"
+        type: "ClusterIP"
+        port: 80
+      applicationPort: "http-port"
+    asserts:
+      - equal:
+          path: spec.ports[0].targetPort
+          value: "http-port"
+
+  - it: should work with different release names
+    set:
+      service:
+        name: "release-test-service"
+        type: "ClusterIP"
+        port: 80
+      applicationPort: 8080
+    release:
+      name: "my-custom-release"
+    asserts:
+      - equal:
+          path: metadata.name
+          value: "release-test-service"
+      - isSubset:
+          path: spec.selector
+          content:
+            app.kubernetes.io/instance: "my-custom-release"

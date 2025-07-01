@@ -1,0 +1,338 @@
+suite: test ingress template
+templates:
+  - ingress.yaml
+tests:
+  - it: should not render when ingress is disabled
+    set:
+      ingress.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should render basic Ingress when enabled
+    set:
+      ingress:
+        enabled: true
+        name: "test-ingress"
+        className: "nginx"
+        hosts:
+          - host: "example.com"
+            paths:
+              - path: "/"
+                pathType: "Prefix"
+      service:
+        name: "test-service"
+        port: 80
+    capabilities:
+      kubeVersion: "1.25.0"
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: Ingress
+      - isAPIVersion:
+          of: networking.k8s.io/v1
+      - equal:
+          path: metadata.name
+          value: "test-ingress"
+      - equal:
+          path: spec.ingressClassName
+          value: "nginx"
+      - equal:
+          path: spec.rules[0].host
+          value: "example.com"
+      - equal:
+          path: spec.rules[0].http.paths[0].path
+          value: "/"
+      - equal:
+          path: spec.rules[0].http.paths[0].pathType
+          value: "Prefix"
+      - equal:
+          path: spec.rules[0].http.paths[0].backend.service.name
+          value: "test-service"
+      - equal:
+          path: spec.rules[0].http.paths[0].backend.service.port.number
+          value: 80
+
+  - it: should include iap labels in metadata
+    set:
+      ingress:
+        enabled: true
+        name: "test-ingress"
+        className: "nginx"
+        hosts:
+          - host: "example.com"
+            paths:
+              - path: "/"
+      service:
+        name: "test-service"
+        port: 80
+    asserts:
+      - isSubset:
+          path: metadata.labels
+          content:
+            app.kubernetes.io/instance: RELEASE-NAME
+            app.kubernetes.io/managed-by: Helm
+            app.kubernetes.io/name: iap
+            app.kubernetes.io/version: 6.0.4
+            helm.sh/chart: iap-1.0.0
+
+  - it: should render annotations when provided
+    set:
+      ingress:
+        enabled: true
+        name: "annotated-ingress"
+        className: "nginx"
+        annotations:
+          nginx.ingress.kubernetes.io/rewrite-target: "/"
+          nginx.ingress.kubernetes.io/ssl-redirect: "true"
+          cert-manager.io/cluster-issuer: "letsencrypt-prod"
+        hosts:
+          - host: "example.com"
+            paths:
+              - path: "/"
+      service:
+        name: "test-service"
+        port: 80
+    asserts:
+      - equal:
+          path: metadata.annotations["nginx.ingress.kubernetes.io/rewrite-target"]
+          value: "/"
+      - equal:
+          path: metadata.annotations["nginx.ingress.kubernetes.io/ssl-redirect"]
+          value: "true"
+      - equal:
+          path: metadata.annotations["cert-manager.io/cluster-issuer"]
+          value: "letsencrypt-prod"
+
+  - it: should not render annotations section when empty
+    set:
+      ingress:
+        enabled: true
+        name: "no-annotations-ingress"
+        className: "nginx"
+        hosts:
+          - host: "example.com"
+            paths:
+              - path: "/"
+      service:
+        name: "test-service"
+        port: 80
+    asserts:
+      - isNull:
+          path: metadata.annotations
+
+  - it: should render TLS configuration when provided
+    set:
+      ingress:
+        enabled: true
+        name: "tls-ingress"
+        className: "nginx"
+        tls:
+          - hosts:
+              - "secure.example.com"
+              - "api.example.com"
+            secretName: "example-tls"
+          - hosts:
+              - "admin.example.com"
+            secretName: "admin-tls"
+        hosts:
+          - host: "secure.example.com"
+            paths:
+              - path: "/"
+      service:
+        name: "test-service"
+        port: 443
+    asserts:
+      - equal:
+          path: spec.tls[0].hosts[0]
+          value: "secure.example.com"
+      - equal:
+          path: spec.tls[0].hosts[1]
+          value: "api.example.com"
+      - equal:
+          path: spec.tls[0].secretName
+          value: "example-tls"
+      - equal:
+          path: spec.tls[1].hosts[0]
+          value: "admin.example.com"
+      - equal:
+          path: spec.tls[1].secretName
+          value: "admin-tls"
+
+  - it: should not render TLS section when not provided
+    set:
+      ingress:
+        enabled: true
+        name: "no-tls-ingress"
+        className: "nginx"
+        hosts:
+          - host: "example.com"
+            paths:
+              - path: "/"
+      service:
+        name: "test-service"
+        port: 80
+    asserts:
+      - isNull:
+          path: spec.tls
+
+  - it: should handle multiple hosts and paths
+    set:
+      ingress:
+        enabled: true
+        name: "multi-host-ingress"
+        className: "traefik"
+        hosts:
+          - host: "api.example.com"
+            paths:
+              - path: "/v1"
+                pathType: "Prefix"
+              - path: "/v2"
+                pathType: "Exact"
+          - host: "web.example.com"
+            paths:
+              - path: "/"
+                pathType: "Prefix"
+              - path: "/admin"
+                pathType: "Prefix"
+      service:
+        name: "multi-service"
+        port: 8080
+    capabilities:
+      kubeVersion: "1.24.0"
+    asserts:
+      - equal:
+          path: spec.rules[0].host
+          value: "api.example.com"
+      - equal:
+          path: spec.rules[0].http.paths[0].path
+          value: "/v1"
+      - equal:
+          path: spec.rules[0].http.paths[0].pathType
+          value: "Prefix"
+      - equal:
+          path: spec.rules[0].http.paths[1].path
+          value: "/v2"
+      - equal:
+          path: spec.rules[0].http.paths[1].pathType
+          value: "Exact"
+      - equal:
+          path: spec.rules[1].host
+          value: "web.example.com"
+      - equal:
+          path: spec.rules[1].http.paths[0].path
+          value: "/"
+      - equal:
+          path: spec.rules[1].http.paths[1].path
+          value: "/admin"
+
+  - it: should render pathType for Kubernetes 1.18+
+    set:
+      ingress:
+        enabled: true
+        name: "new-k8s-ingress"
+        className: "nginx"
+        hosts:
+          - host: "modern.example.com"
+            paths:
+              - path: "/"
+                pathType: "Prefix"
+      service:
+        name: "modern-service"
+        port: 80
+    capabilities:
+      kubeVersion: "1.18.0"
+    asserts:
+      - equal:
+          path: spec.rules[0].http.paths[0].pathType
+          value: "Prefix"
+
+  - it: should handle different ingress classes
+    set:
+      ingress:
+        enabled: true
+        name: "traefik-ingress"
+        className: "traefik"
+        hosts:
+          - host: "traefik.example.com"
+            paths:
+              - path: "/"
+      service:
+        name: "traefik-service"
+        port: 3000
+    asserts:
+      - equal:
+          path: spec.ingressClassName
+          value: "traefik"
+
+  - it: should use service variables correctly
+    set:
+      ingress:
+        enabled: true
+        name: "service-test-ingress"
+        className: "nginx"
+        hosts:
+          - host: "service-test.example.com"
+            paths:
+              - path: "/api"
+      service:
+        name: "custom-backend-service"
+        port: 9090
+    asserts:
+      - equal:
+          path: spec.rules[0].http.paths[0].backend.service.name
+          value: "custom-backend-service"
+      - equal:
+          path: spec.rules[0].http.paths[0].backend.service.port.number
+          value: 9090
+
+  - it: should handle wildcard hosts
+    set:
+      ingress:
+        enabled: true
+        name: "wildcard-ingress"
+        className: "nginx"
+        hosts:
+          - host: "*.example.com"
+            paths:
+              - path: "/"
+                pathType: "Prefix"
+        tls:
+          - hosts:
+              - "*.example.com"
+            secretName: "wildcard-tls"
+      service:
+        name: "wildcard-service"
+        port: 80
+    capabilities:
+      kubeVersion: "1.25.0"
+    asserts:
+      - equal:
+          path: spec.rules[0].host
+          value: "*.example.com"
+      - equal:
+          path: spec.tls[0].hosts[0]
+          value: "*.example.com"
+
+  - it: should handle paths without pathType
+    set:
+      ingress:
+        enabled: true
+        name: "no-pathtype-ingress"
+        className: "nginx"
+        hosts:
+          - host: "no-pathtype.example.com"
+            paths:
+              - path: "/"
+      service:
+        name: "no-pathtype-service"
+        port: 80
+    capabilities:
+      kubeVersion: "1.25.0"
+    asserts:
+      - equal:
+          path: spec.rules[0].http.paths[0].path
+          value: "/"
+      - isNull:
+          path: spec.rules[0].http.paths[0].pathType

@@ -1,0 +1,164 @@
+suite: test storage class template
+templates:
+  - storage-class.yaml
+tests:
+  - it: should not render when storageClass is disabled
+    set:
+      storageClass.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should render StorageClass when enabled with default values
+    set:
+      storageClass:
+        enabled: true
+        name: "test-storage-class"
+        provisioner: "kubernetes.io/aws-ebs"
+        reclaimPolicy: "Delete"
+        volumeBindingMode: "WaitForFirstConsumer"
+        parameters:
+          type: "gp3"
+          fsType: "ext4"
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: StorageClass
+      - isAPIVersion:
+          of: storage.k8s.io/v1
+      - equal:
+          path: metadata.name
+          value: "test-storage-class"
+      - equal:
+          path: provisioner
+          value: "kubernetes.io/aws-ebs"
+      - equal:
+          path: reclaimPolicy
+          value: "Delete"
+      - equal:
+          path: volumeBindingMode
+          value: "WaitForFirstConsumer"
+      - equal:
+          path: parameters.type
+          value: "gp3"
+      - equal:
+          path: parameters.fsType
+          value: "ext4"
+
+  - it: should include iap labels in metadata
+    set:
+      storageClass:
+        enabled: true
+        name: "test-storage-class"
+        provisioner: "kubernetes.io/aws-ebs"
+        reclaimPolicy: "Delete"
+        volumeBindingMode: "WaitForFirstConsumer"
+        parameters: {}
+    asserts:
+      - isSubset:
+          path: metadata.labels
+          content:
+            app.kubernetes.io/instance: RELEASE-NAME
+            app.kubernetes.io/managed-by: Helm
+            app.kubernetes.io/name: iap
+            app.kubernetes.io/version: 6.0.4
+            helm.sh/chart: iap-1.0.0
+
+  - it: should handle different provisioners
+    set:
+      storageClass:
+        enabled: true
+        name: "azure-storage"
+        provisioner: "kubernetes.io/azure-disk"
+        reclaimPolicy: "Retain"
+        volumeBindingMode: "Immediate"
+        parameters:
+          storageaccounttype: "Premium_LRS"
+          kind: "Managed"
+    asserts:
+      - equal:
+          path: provisioner
+          value: "kubernetes.io/azure-disk"
+      - equal:
+          path: reclaimPolicy
+          value: "Retain"
+      - equal:
+          path: volumeBindingMode
+          value: "Immediate"
+      - equal:
+          path: parameters.storageaccounttype
+          value: "Premium_LRS"
+      - equal:
+          path: parameters.kind
+          value: "Managed"
+
+  - it: should handle empty parameters
+    set:
+      storageClass:
+        enabled: true
+        name: "simple-storage"
+        provisioner: "kubernetes.io/no-provisioner"
+        reclaimPolicy: "Delete"
+        volumeBindingMode: "WaitForFirstConsumer"
+        parameters: {}
+    asserts:
+      - equal:
+          path: parameters
+          value: {}
+
+  - it: should handle complex parameters structure
+    set:
+      storageClass:
+        enabled: true
+        name: "complex-storage"
+        provisioner: "ebs.csi.aws.com"
+        reclaimPolicy: "Delete"
+        volumeBindingMode: "WaitForFirstConsumer"
+        parameters:
+          type: "gp3"
+          fsType: "ext4"
+          encrypted: "true"
+          iops: "3000"
+          throughput: "125"
+    asserts:
+      - equal:
+          path: parameters.type
+          value: "gp3"
+      - equal:
+          path: parameters.encrypted
+          value: "true"
+      - equal:
+          path: parameters.iops
+          value: "3000"
+      - equal:
+          path: parameters.throughput
+          value: "125"
+
+  - it: should handle retain reclaim policy
+    set:
+      storageClass:
+        enabled: true
+        name: "retain-storage"
+        provisioner: "kubernetes.io/aws-ebs"
+        reclaimPolicy: "Retain"
+        volumeBindingMode: "WaitForFirstConsumer"
+        parameters: {}
+    asserts:
+      - equal:
+          path: reclaimPolicy
+          value: "Retain"
+
+  - it: should handle immediate volume binding mode
+    set:
+      storageClass:
+        enabled: true
+        name: "immediate-storage"
+        provisioner: "kubernetes.io/aws-ebs"
+        reclaimPolicy: "Delete"
+        volumeBindingMode: "Immediate"
+        parameters: {}
+    asserts:
+      - equal:
+          path: volumeBindingMode
+          value: "Immediate"
