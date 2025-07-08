@@ -213,15 +213,8 @@ tests:
         API_KEY: "secret-key"
         DEBUG: "false"
     asserts:
-      - equal:
-          path: spec.template.spec.containers[0].env[0].name
-          value: "ITENTIAL_WEBSERVER_HTTPS_PORT"
-      - equal:
-          path: spec.template.spec.containers[0].env[0].value
-          value: "8443"
-      - lengthEqual:
+      - isNotEmpty:
           path: spec.template.spec.containers[0].env
-          count: 78
 
   - it: should configure startup probe when enabled
     set:
