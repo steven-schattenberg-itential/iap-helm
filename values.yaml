@@ -7,6 +7,8 @@ replicaCount: 3
 
 applicationPort: 3443
 useTLS: true
+mountAdapterVolume: false
+mountLogVolume: false
 
 certManager:
   enabled: true
@@ -170,6 +172,9 @@ volumeMounts: []
 affinity: {}
 
 # Configuration properties for Itential Automation Platform.
+# In most cases, the default values are sufficient. If the property is commented that means that
+# the default value is being used. This is a list of all possible values for convenience. The
+# values listed are the defaults where commented.
 env:
   ##############
   #SERVER
@@ -180,17 +185,20 @@ env:
   # ITENTIAL_PROFILE_ID: ""
 
   # An identifier for the server instance. This is used to uniquely identify the server in a
-  # multi-server environment. If not provided, the server will generate one on startup.
-  ITENTIAL_SERVER_ID: ""
+  # multi-server environment. If not provided, the server will generate one on startup. This will
+  # be populated by the chart to the pod id and should not be used in a containerized deployment.
+  # ITENTIAL_SERVER_ID: ""
 
   # The file path to the directory containing additional services (applications and adapters).
-  ITENTIAL_SERVICE_DIRECTORY: ""
+  # The chart will impose this value with an opinionated volume mount directory and should not be
+  # used in a containerized deployment.
+  # ITENTIAL_SERVICE_DIRECTORY: ""
 
   # Indicates whether the platform is using encrypted code files.
-  ITENTIAL_PLATFORM_ENCRYPTED: "true"
+  # ITENTIAL_PLATFORM_ENCRYPTED: "true"
 
   # 64-length hex string describing a 256 bit encryption key.
-  ITENTIAL_ENCRYPTION_KEY: ""
+  # ITENTIAL_ENCRYPTION_KEY: ""
 
   # A whitelist of services (applications/adapters) to initialize on startup of the platform.
   # If no value is given, all services will be initialized.
@@ -200,37 +208,37 @@ env:
   # ITENTIAL_SERVICE_BLACKLIST : ""
 
   # The amount of time a service should wait before shutting down, in seconds.
-  ITENTIAL_PLATFORM_SHUTDOWN_TIMEOUT: "3"
+  # ITENTIAL_PLATFORM_SHUTDOWN_TIMEOUT: "3"
 
   # How often to update service health, measured in seconds.
-  ITENTIAL_SERVICE_HEALTH_CHECK_INTERVAL : "5"
+  # ITENTIAL_SERVICE_HEALTH_CHECK_INTERVAL : "5"
 
   # The number of failed health checks in a row before a service is considered to be “unhealthy”.
-  ITENTIAL_SERVICE_HEALTH_CHECK_UNHEALTHY_THRESHOLD: "3"
+  # ITENTIAL_SERVICE_HEALTH_CHECK_UNHEALTHY_THRESHOLD: "3"
 
   # If true, the platform will periodically check for dead processes.
-  ITENTIAL_DEAD_PROCESS_CHECK_ENABLED: "true"
+  # ITENTIAL_DEAD_PROCESS_CHECK_ENABLED: "true"
 
   # How often to check if application/adapter stopped sending healthcheck pings, in seconds.
-  ITENTIAL_DEAD_PROCESS_CHECK_INTERVAL: "5"
+  # ITENTIAL_DEAD_PROCESS_CHECK_INTERVAL: "5"
 
   # Maximum time period for application/adapter without sending healthcheck ping, in seconds.
-  ITENTIAL_DEAD_PROCESS_MAX_PERIOD: "15"
+  # ITENTIAL_DEAD_PROCESS_MAX_PERIOD: "15"
 
   # Specifies the amount of times services will retry on crash before stopping.
-  ITENTIAL_SERVICE_CRASH_RECOVERY_MAX_RETRIES: "10"
+  # ITENTIAL_SERVICE_CRASH_RECOVERY_MAX_RETRIES: "10"
 
   # Specifies the amount of times between each retry before the count will reset in milliseconds.
-  ITENTIAL_SERVICE_CRASH_RECOVERY_RESET_RETRIES_AFTER_MS: "60000"
+  # ITENTIAL_SERVICE_CRASH_RECOVERY_RESET_RETRIES_AFTER_MS: "60000"
 
   # The timeout for external API requests, in seconds.
-  ITENTIAL_EXTERNAL_REQUEST_TIMEOUT : "5"
+  # ITENTIAL_EXTERNAL_REQUEST_TIMEOUT : "5"
 
   # The interval for how often IAP polls for the number of devices, in hours.
-  ITENTIAL_DEVICE_COUNT_POLLING_INTERVAL : "24"
+  # ITENTIAL_DEVICE_COUNT_POLLING_INTERVAL : "24"
 
   # If true, the platform will track detailed audit events.
-  ITENTIAL_AUDIT_ENABLED: "true"
+  # ITENTIAL_AUDIT_ENABLED: "true"
 
   #############################
   # MONGO DATABASE CONNECTION #
@@ -242,20 +250,20 @@ env:
   ITENTIAL_MONGO_USER: "itential"
 
   # The password to use when connecting to MongoDB.
-  ITENTIAL_MONGO_PASSWORD: ""
+  # ITENTIAL_MONGO_PASSWORD: ""
 
   # The name of the database that the MongoDB user must authenticate against.
   # ITENTIAL_MONGO_AUTH_DB: ""
 
   # If true, the server will not check if it is connecting to a compatible MongoDB version.
-  ITENTIAL_MONGO_BYPASS_VERSION_CHECK: "true"
+  # ITENTIAL_MONGO_BYPASS_VERSION_CHECK: "true"
 
   # The name of the MongoDB logical database to connect to.
   ITENTIAL_MONGO_DB_NAME: "itential"
 
   # The MongoDB connection string. For a replica set this will include all members of the
   # replica set. For Mongo Atlas this will be the SRV connection format.
-  ITENTIAL_MONGO_URL: ""
+  # ITENTIAL_MONGO_URL: ""
 
   # Instruct the MongoDB driver to use TLS protocols when connecting to the database.
   ITENTIAL_MONGO_TLS_ENABLED: "false"
@@ -282,13 +290,13 @@ env:
   ITENTIAL_REDIS_USERNAME: "itential"
 
   # The password to use when connecting to Redis.
-  ITENTIAL_REDIS_PASSWORD: ""
+  # ITENTIAL_REDIS_PASSWORD: ""
 
   # The maximum number of times to retry a request to Redis when the connection is lost.
-  ITENTIAL_REDIS_MAX_RETRIES_PER_REQUEST : "20"
+  # ITENTIAL_REDIS_MAX_RETRIES_PER_REQUEST : "20"
 
   # The maximum number of times to retry writing a heartbeat message to Redis from a service.
-  ITENTIAL_REDIS_MAX_HEARTBEAT_WRITE_RETRIES: "20"
+  # ITENTIAL_REDIS_MAX_HEARTBEAT_WRITE_RETRIES: "20"
 
   # The hostname of the Redis server. Not used when connecting to Redis Sentinels.
   ITENTIAL_REDIS_HOST: ""
@@ -349,20 +357,20 @@ env:
   ###################
   # If true, will start working tasks immediately after the server startup process is complete.
   # If false, the task worker must be enabled manually via the UI/API.
-  ITENTIAL_TASK_WORKER_ENABLED: "true"
+  # ITENTIAL_TASK_WORKER_ENABLED: "true"
 
   # If true, will allow jobs to be started after the server startup process is complete.
   # If false, API calls to start Jobs will return an error until enabled manually via the UI/API.
-  ITENTIAL_JOB_WORKER_ENABLED: "true"
+  # ITENTIAL_JOB_WORKER_ENABLED: "true"
 
   ######################
   # INTEGRATION WORKER #
   ######################
   # The number of threads available for API requests.
-  ITENTIAL_INTEGRATION_THREAD_COUNT: "5"
+  # ITENTIAL_INTEGRATION_THREAD_COUNT: "5"
 
   # The number of milliseconds until an integration request times out.
-  ITENTIAL_INTEGRATION_TIMEOUT: "15000"
+  # ITENTIAL_INTEGRATION_TIMEOUT: "15000"
 
   ###############
   # PLATFORM UI #
@@ -371,65 +379,65 @@ env:
   # ITENTIAL_UI_LAYOUT_FILE: ""
 
   # Path to the HTML file that will be displayed as the home page for the UI.
-  ITENTIAL_UI_HOME_FILE: "node_modules/@itential/iap-ui/build/index.html"
+  # ITENTIAL_UI_HOME_FILE: "node_modules/@itential/iap-ui/build/index.html"
 
   # Path to the HTML file that will be displayed as the login page for the UI.
-  ITENTIAL_UI_LOGIN_FILE: "node_modules/@itential/iap-ui/build/index.html"
+  # ITENTIAL_UI_LOGIN_FILE: "node_modules/@itential/iap-ui/build/index.html"
 
   # Path to the HTML file that will be displayed as the profile page for the UI.
-  ITENTIAL_UI_PROFILE_FILE: "node_modules/@itential/iap-ui/build/index.html"
+  # ITENTIAL_UI_PROFILE_FILE: "node_modules/@itential/iap-ui/build/index.html"
 
   # Path to the favicon file that will be displayed in the browser tab.
-  ITENTIAL_UI_FAVICON: "ui/img/favicon.ico"
+  # ITENTIAL_UI_FAVICON: "ui/img/favicon.ico"
 
   # Path to the apple touch icon file that will be displayed on iOS devices.
-  ITENTIAL_UI_APPLE_TOUCH_ICON_FILE: "ui/img/apple-touch-icon.png"
+  # ITENTIAL_UI_APPLE_TOUCH_ICON_FILE: "ui/img/apple-touch-icon.png"
 
   ##################
   # AUTHENTICATION #
   ##################
   # If true, logs out existing sessions for a user when they log in with a new session.
-  ITENTIAL_AUTH_UNIQUE_SESSIONS_ENABLED: "false"
+  # ITENTIAL_AUTH_UNIQUE_SESSIONS_ENABLED: "false"
 
   # Members of these groups will be implicitly assigned with admin permissions.
   # ITENTIAL_AUTH_ADMIN_GROUPS: '[]'
 
   # Enables a AAA adapter to custom build the principal object for a user with
   # a "buildPrincipal" method.
-  ITENTIAL_AUTH_BROKER_PRINCIPAL_ENABLED: "false"
+  # ITENTIAL_AUTH_BROKER_PRINCIPAL_ENABLED: "false"
 
   # The name of the cookie used for a user session.
-  ITENTIAL_AUTH_SESSION_COOKIE_NAME: "token"
+  # ITENTIAL_AUTH_SESSION_COOKIE_NAME: "token"
 
   # The time in minutes before a user session expires.
-  ITENTIAL_AUTH_SESSION_TTL: "60"
+  # ITENTIAL_AUTH_SESSION_TTL: "60"
 
   # Enables a default user to be used for login when SSO is not configured and no AAA Adapter exists.
-  ITENTIAL_DEFAULT_USER_ENABLED: "true"
+  # ITENTIAL_DEFAULT_USER_ENABLED: "true"
 
   # The username of the default user.
-  ITENTIAL_DEFAULT_USER_USERNAME: "admin"
+  # ITENTIAL_DEFAULT_USER_USERNAME: "admin"
 
   # The password of the default user.
-  ITENTIAL_DEFAULT_USER_PASSWORD: ""
+  # ITENTIAL_DEFAULT_USER_PASSWORD: ""
 
   #############
   # WEBSERVER #
   #############
   # A toggle to instruct the webserver to include HTTP cache control headers on the response.
-  ITENTIAL_WEBSERVER_CACHE_CONTROL_ENABLED: "false"
+  # ITENTIAL_WEBSERVER_CACHE_CONTROL_ENABLED: "false"
 
   # Timeout to use for incoming HTTP requests to the platform API, in milliseconds.
-  ITENTIAL_WEBSERVER_TIMEOUT: "300000"
+  # ITENTIAL_WEBSERVER_TIMEOUT: "300000"
 
   # The value of the HTTP Access-Control-Allow-Origin header returned to clients.
-  ITENTIAL_WEBSERVER_RESPONSE_HEADER_ACCESS_CONTROL_ALLOW_ORIGIN: "*"
+  # ITENTIAL_WEBSERVER_RESPONSE_HEADER_ACCESS_CONTROL_ALLOW_ORIGIN: "*"
 
   # If true, allows the webserver to respond to insecure HTTP requests.
-  ITENTIAL_WEBSERVER_HTTP_ENABLED: "false"
+  # ITENTIAL_WEBSERVER_HTTP_ENABLED: "false"
 
   # If true, allows the webserver to respond to secure HTTPS requests.
-  ITENTIAL_WEBSERVER_HTTPS_ENABLED: "true"
+  # ITENTIAL_WEBSERVER_HTTPS_ENABLED: "true"
 
   # The path to the public key file used for HTTPS connections.
   # ITENTIAL_WEBSERVER_HTTPS_KEY: "/etc/ssl/certs/platform/server.key"
@@ -441,16 +449,16 @@ env:
   # ITENTIAL_WEBSERVER_HTTPS_CERT: "/etc/ssl/certs/platform/server.crt"
 
   # The set of allowed SSL/TLS protocol versions.
-  ITENTIAL_WEBSERVER_HTTPS_SECURE_PROTOCOL: "TLSv1_2_method"
+  # ITENTIAL_WEBSERVER_HTTPS_SECURE_PROTOCOL: "TLSv1_2_method"
 
   # The allowed SSL/TLS cipher suite.
-  ITENTIAL_WEBSERVER_HTTPS_CIPHERS: "ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-SHA256:DHE-RSA-AES128-SHA256:ECDHE-RSA-AES256-SHA384:DHE-RSA-AES256-SHA384:ECDHE-RSA-AES256-SHA256:DHE-RSA-AES256-SHA256:HIGH:!aNULL:!eNULL:!EXPORT:!DES:!RC4:!MD5:!PSK:!SRP:!CAMELLIA"
+  # ITENTIAL_WEBSERVER_HTTPS_CIPHERS: "ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-SHA256:DHE-RSA-AES128-SHA256:ECDHE-RSA-AES256-SHA384:DHE-RSA-AES256-SHA384:ECDHE-RSA-AES256-SHA256:DHE-RSA-AES256-SHA256:HIGH:!aNULL:!eNULL:!EXPORT:!DES:!RC4:!MD5:!PSK:!SRP:!CAMELLIA"
 
   # Specifies the number of renegotiations that are allowed in a single HTTPS connection.
-  ITENTIAL_WEBSERVER_HTTPS_CLIENT_RENEG_LIMIT: "3"
+  # ITENTIAL_WEBSERVER_HTTPS_CLIENT_RENEG_LIMIT: "3"
 
   # Specifies the time renegotiation window in seconds for a single HTTPS connection.
-  ITENTIAL_WEBSERVER_HTTPS_CLIENT_RENEG_WINDOW: "600"
+  # ITENTIAL_WEBSERVER_HTTPS_CLIENT_RENEG_WINDOW: "600"
 
   # The set of allowed HTTP verbs in addition to those defined in the standard HTTP/1.1 protocol.
   # ITENTIAL_WEBSERVER_HTTP_ALLOWED_OPTIONAL_VERBS: ""
@@ -459,58 +467,58 @@ env:
   # LOGGING #
   ###########
   # The maximum number of each log file to keep as rotation occurs.
-  ITENTIAL_LOG_MAX_FILES: "100"
+  # ITENTIAL_LOG_MAX_FILES: "100"
 
   # The maximum file size in bytes of each log file before rotation occurs.
-  ITENTIAL_LOG_MAX_FILE_SIZE: "1048576"
+  # ITENTIAL_LOG_MAX_FILE_SIZE: "1048576"
 
   # The minimum log level to display in the log file.
-  ITENTIAL_LOG_LEVEL: "info"
+  # ITENTIAL_LOG_LEVEL: "info"
 
   # The absolute directory path where log files are written.
-  ITENTIAL_LOG_DIRECTORY: "/var/log/itential/platform"
+  # ITENTIAL_LOG_DIRECTORY: "/var/log/itential/platform"
 
   # The name of the primary platform log file.
-  ITENTIAL_LOG_FILENAME: "platform.log"
+  # ITENTIAL_LOG_FILENAME: "platform.log"
 
   # The minimum log level to display in the console (stdout).
-  ITENTIAL_LOG_LEVEL_CONSOLE: "warn"
+  # ITENTIAL_LOG_LEVEL_CONSOLE: "warn"
 
   # The absolute directory path where webserver log files are written.
-  ITENTIAL_WEBSERVER_LOG_DIRECTORY: "/var/log/itential/platform"
+  # ITENTIAL_WEBSERVER_LOG_DIRECTORY: "/var/log/itential/platform"
 
   # The name of the webserver log file.
-  ITENTIAL_WEBSERVER_LOG_FILENAME: "webserver.log"
+  # ITENTIAL_WEBSERVER_LOG_FILENAME: "webserver.log"
 
   # The minimum log level to send to the syslog server.
-  ITENTIAL_LOG_LEVEL_SYSLOG: "warning"
+  # ITENTIAL_LOG_LEVEL_SYSLOG: "warning"
 
   # The hostname or IP address of the syslog server.
-  ITENTIAL_SYSLOG_HOST: "localhost"
+  # ITENTIAL_SYSLOG_HOST: "localhost"
 
   # The port number of the syslog server.
-  ITENTIAL_SYSLOG_PORT: "514"
+  # ITENTIAL_SYSLOG_PORT: "514"
 
   # The protocol to use when sending logs to the syslog server.
-  ITENTIAL_SYSLOG_PROTOCOL: "udp4"
+  # ITENTIAL_SYSLOG_PROTOCOL: "udp4"
 
   # The syslog facility to use when sending logs to the syslog server.
-  ITENTIAL_SYSLOG_FACILITY: "local0"
+  # ITENTIAL_SYSLOG_FACILITY: "local0"
 
   # The syslog message format to use when sending logs to the syslog server.
-  ITENTIAL_SYSLOG_TYPE: "BSD"
+  # ITENTIAL_SYSLOG_TYPE: "BSD"
 
   # The path to the syslog server file.
-  ITENTIAL_SYSLOG_PATH: "/dev/log"
+  # ITENTIAL_SYSLOG_PATH: "/dev/log"
 
   # The process property to include as the process id in the syslog message.
-  ITENTIAL_SYSLOG_PID: "process.pid"
+  # ITENTIAL_SYSLOG_PID: "process.pid"
 
   # The hostname to include in the syslog message.
-  ITENTIAL_SYSLOG_LOCALHOST: "localhost"
+  # ITENTIAL_SYSLOG_LOCALHOST: "localhost"
 
   # The process property to include as the application name in the syslog message.
-  ITENTIAL_SYSLOG_APP_NAME: "process.title"
+  # ITENTIAL_SYSLOG_APP_NAME: "process.title"
 
   # The end of line character to include in the syslog message.
   # ITENTIAL_SYSLOG_EOL: ""
@@ -526,13 +534,13 @@ env:
 
   # If true, the platform will perform strict JSON Schema validation on messages into the brokers
   # and coming back to the broker layer from adapters.
-  ITENTIAL_BROKER_VALIDATION_ENABLED: "false"
+  # ITENTIAL_BROKER_VALIDATION_ENABLED: "false"
 
   ########
   # SNMP #
   ########
   # Remote SNMP destination configuration objects.
-  ITENTIAL_SNMP_ALARM_CONFIGS: '[{"ip": "localhost", "community": "public", "type": "trap", "properties": {"port": 161, "retries": 1, "timeout": 5000, "transport": "udp4", "trapPort": 162, "version": "V1"}}]'
+  # ITENTIAL_SNMP_ALARM_CONFIGS: '[{"ip": "localhost", "community": "public", "type": "trap", "properties": {"port": 161, "retries": 1, "timeout": 5000, "transport": "udp4", "trapPort": 162, "version": "V1"}}]'
 
   #
   # END IAP CONFIGURATION PROPERTIES
