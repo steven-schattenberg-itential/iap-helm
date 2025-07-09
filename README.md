@@ -4,32 +4,59 @@ This repo contains helm charts for running Itential Automation Platform in Kuber
 
 ## Itential Automation Platform (IAP)
 
-The chart will not install any dependencies of the IAP application. The chart assumes that those are
-running, configured, and bootstrapped with all necessary data. The application is installed using a
-Kubernetes statefulset. It also includes persistent volume claims, ingress, and other Kubernetes
-objects suitable to run the application.
+The chart will not install the Redis and MongoDB dependencies of the IAP application. The chart
+assumes that those are running, configured, and bootstrapped with all necessary data. The
+application is installed using a Kubernetes statefulset. It also includes persistent volume claims,
+ingress, and other Kubernetes objects suitable to run the application.
+
+This chart is optimized for Itential version P6 and beyond and will not work with older Itential
+versions.
 
 ### Usage
+
+This will install IAP according to how its configured in the values.yaml file ("latest").
 
 ```bash
 helm install iap . -f values.yaml
 ```
 
-This will install IAP according to how its configured in the values.yaml file ("latest").
+This will install IAP with the "6.0.4" image.
 
 ```bash
-helm install iap . -f values.yaml --set image.tag=2023.2.7
+helm install iap . -f values.yaml --set image.tag=6.0.4
 ```
-
-This will install IAP with the "2023.2.7" image.
-
-```bash
-helm install iap ./iap --sete propertiesJson.dbUrl="mongodb+srv://<some-username>:<some-password>@<some-mongo-url>"
-```
-
-This will install IAP using the mongo connection string provided.
 
 ### Requirements & Dependencies
+
+#### Secrets
+
+The chart assumes the following secrets, they are not included in the Chart.
+
+##### imagePullSecrets
+
+This is the secret that will pull the image from the Itential ECR. Name to be determined by the user
+ of the chart and that name must be provided in the values file (`imagePullSecrets[0].name`).
+
+##### itential-platform-secrets
+
+This secret contains several sensitive values that the application may use. They are loaded into the
+pod as environment variables. Some are optional and depend on your implementation.
+
+| Secret Key | Description | Required? |
+|:-----------|:------------|:----------|
+| ITENTIAL_DEFAULT_USER_PASSWORD | The password for the default local user, normally only used during installation and initial configuration. | Yes |
+| ITENTIAL_ENCRYPTION_KEY | Used by the application for native encryption of sensitive values. 64-length hex string describing a 256 bit encryption key. | Yes |
+| ITENTIAL_MONGO_PASSWORD | The MongoDB password for the `itential` user. | Yes |
+| ITENTIAL_MONGO_URL | The MongoDB connection string, which can sometimes contain passwords. | Yes |
+| ITENTIAL_REDIS_PASSWORD | The Redis password for the `itential` user. | Yes |
+| ITENTIAL_REDIS_SENTINEL_PASSWORD | The Redis Sentinel password for the `itential` user. Only required if connecting to a Redis replica set that also uses Redis Sentinel. | No |
+| ITENTIAL_VAULT_SECRET_ID | The Hashicorp Vault Secret ID when using Hashicorp Vault as the secrets manager. Only required if using Hashicorp Vault for secrets. | No |
+| ITENTIAL_WEBSERVER_HTTPS_PASSPHRASE | The passphrase used in conjunction with an HTTPS certificate. | No |
+
+##### iap-ca
+
+This secret represents the CA used by cert-manager to derive all the TLS certificates. Name to be
+provided by the user of the chart in the values file (`issuer.caSecretName`) if using cert-manager.
 
 #### Certificates
 
@@ -48,9 +75,11 @@ of this chart. To check if this is already installed run this command:
 kubectl get crds | grep cert-manager
 ```
 
+For more information see the [Cert Manager project](https://cert-manager.io/).
+
 #### DNS
 
-This is not a requirement but more of an explanation.
+This is an optional requirement.
 
 Itential used the ExternalDNS project to facilitate the creation of DNS entries. ExternalDNS
 synchronizes exposed Kubernetes Services and Ingresses with DNS providers. This is not a
@@ -63,25 +92,24 @@ For more information see the [ExternalDNS project](https://github.com/kubernetes
 
 | Name | Type | Description |
 |:-----|:-----|:------------|
-| config-volume     | Configmap               | Configuration properties for the IAP properties.json file. This is the main config file for the IAP application. |
-| iap-logs-volume   | Persistent Volume Claim | A persistent volume claim to mount a directory to write IAP log files to                                               |
-| iap-assest-volume | Persistent Volume Claim | A persistent volume claim to mount a directory that includes adapters and apps                                         |
+| iap-logs-volume | Persistent Volume Claim | A persistent volume claim to mount a directory to write IAP log files to |
+| iap-assest-volume | Persistent Volume Claim | A persistent volume claim to mount a directory that includes adapters and apps |
 
 ### How to construct the iap-asset-volume
 
-This volume is intended to store the applications and adapters. Its contents will reflect a customer's unique usage of IAP and contain all of the adapters and custom applications required. There is an expectation in the container of the structure of the files in this volume. It should look like this:
+This volume is intended to store the applications and adapters unique to a customer. Its contents
+will reflect a customer's unique usage of IAP and contain all of the adapters and custom
+applications required. There is an expectation in the container of the structure of the files in
+this volume. All adapters and applications can be added into the same parent directory that will
+then be mounted in the container.
 
 ```bash
 .
-└── node_modules/
-    ├── @itentialopensource/
-    │   ├── opensource-adapter1
-    │   └── opensource-adapter2
-    ├── @itential/
-    │   └── app-artifacts
-    └── @customer-namespace/
-        ├── custom-adapter1
-        └── custom-adapter2
+├── adapter1/
+├── adapter2/
+├── custom-application1/
+└── custom-application2/
 ```
 
-This will be correctly translated inside the container to the appropriate directories for IAP to understand.
+This will be correctly translated inside the container to the appropriate directories for IAP to
+understand.
