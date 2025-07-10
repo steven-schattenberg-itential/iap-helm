@@ -5,9 +5,10 @@
 {{- if not .Values.issuer.caSecretName -}}
 {{- fail "issuer.caSecretName is required when issuer is enabled" -}}
 {{- end -}}
-# Copyright (c) 2025, Itential, Inc
-# GNU General Public License v3.0+ (see LICENSE or https://www.gnu.org/licenses/gpl-3.0.txt)
-# Source: iap-helm/templates/issuer.yaml
+{{/*
+Copyright (c) 2025, Itential, Inc
+GNU General Public License v3.0+ (see LICENSE or https://www.gnu.org/licenses/gpl-3.0.txt)
+*/}}
 ---
 apiVersion: cert-manager.io/v1
 kind: Issuer
