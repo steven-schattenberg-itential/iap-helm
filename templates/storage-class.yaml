@@ -1,7 +1,8 @@
 {{- if .Values.storageClass.enabled -}}
-# Copyright (c) 2024, Itential, Inc
-# GNU General Public License v3.0+ (see LICENSE or https://www.gnu.org/licenses/gpl-3.0.txt)
-# Source: iap/templates/storage-class.yaml
+{{/*
+Copyright (c) 2024, Itential, Inc
+GNU General Public License v3.0+ (see LICENSE or https://www.gnu.org/licenses/gpl-3.0.txt)
+*/}}
 ---
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
@@ -14,11 +15,13 @@ parameters:
   {{- toYaml .Values.storageClass.parameters | nindent 2 }}
 reclaimPolicy: {{ .Values.storageClass.reclaimPolicy }}
 volumeBindingMode: {{ .Values.storageClass.volumeBindingMode }}
-# ---
-# apiVersion: storage.k8s.io/v1
-# kind: StorageClass
-# metadata:
-#   name: local-storage
-# provisioner: kubernetes.io/no-provisioner
-# volumeBindingMode: WaitForFirstConsumer
+{{/*
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: local-storage
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer
+*/}}
 {{- end }}
