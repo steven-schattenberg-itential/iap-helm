@@ -36,7 +36,7 @@ tests:
           of: apps/v1
       - equal:
           path: spec.serviceName
-          value: "iap-service"
+          value: "iap-service-headless"
       - equal:
           path: spec.replicas
           value: 3

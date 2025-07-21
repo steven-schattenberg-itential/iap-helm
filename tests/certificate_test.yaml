@@ -2,24 +2,24 @@ suite: test certificate template
 templates:
   - certificate.yaml
 tests:
-  - it: should not render when certificate is disabled
+  - it: should not render certificate when disabled
     set:
       certificate.enabled: false
     asserts:
       - hasDocuments:
           count: 0
 
-  - it: should render Certificate when enabled with default values
+  - it: should render certificate when enabled with default values
     set:
-      certificate:
-        enabled: true
-        hostname: "example.com"
-        issuerRef:
-          name: "letsencrypt-prod"
-          kind: "ClusterIssuer"
-        renewBefore: "720h"
-        duration: "2160h"
-      nameOverride: "test-app"
+      certificate.enabled: true
+      certificate.issuerRef.name: "letsencrypt-prod"
+      certificate.issuerRef.kind: "ClusterIssuer"
+      certificate.commonName: "iap.example.com"
+      certificate.domain: "example.com"
+      certificate.renewBefore: "720h"
+      certificate.duration: "2160h"
+      replicaCount: 1
+      fullnameOverride: "my-iap"
     asserts:
       - hasDocuments:
           count: 1
@@ -29,10 +29,10 @@ tests:
           of: cert-manager.io/v1
       - equal:
           path: metadata.name
-          value: "RELEASE-NAME-test-app-tls"
+          value: "my-iap-tls"
       - equal:
           path: spec.secretName
-          value: "RELEASE-NAME-test-app-tls-secret"
+          value: "my-iap-tls-secret"
       - equal:
           path: spec.issuerRef.name
           value: "letsencrypt-prod"
@@ -41,189 +41,176 @@ tests:
           value: "ClusterIssuer"
       - equal:
           path: spec.commonName
-          value: "example.com"
-      - equal:
-          path: spec.dnsNames[0]
-          value: "example.com"
+          value: "iap.example.com"
       - equal:
           path: spec.renewBefore
           value: "720h"
       - equal:
           path: spec.duration
           value: "2160h"
+      - contains:
+          path: spec.dnsNames
+          content: "iap.example.com"
+      - contains:
+          path: spec.dnsNames
+          content: "my-iap-0.example.com"
+      - lengthEqual:
+          path: spec.dnsNames
+          count: 2
 
-  - it: should include iap labels in metadata
+  - it: should render certificate with multiple replicas
     set:
-      certificate:
-        enabled: true
-        hostname: "test.example.com"
-        issuerRef:
-          name: "test-issuer"
-          kind: "Issuer"
-        renewBefore: "720h"
-        duration: "2160h"
+      certificate.enabled: true
+      certificate.issuerRef.name: "letsencrypt-staging"
+      certificate.issuerRef.kind: "Issuer"
+      certificate.commonName: "iap.staging.com"
+      certificate.domain: "staging.com"
+      certificate.renewBefore: "168h"
+      certificate.duration: "720h"
+      replicaCount: 3
+    release:
+      name: iap
     asserts:
-      - isSubset:
-          path: metadata.labels
-          content:
-            app.kubernetes.io/instance: RELEASE-NAME
-            app.kubernetes.io/managed-by: Helm
-            app.kubernetes.io/name: iap
-            app.kubernetes.io/version: 6.0.4
-            helm.sh/chart: iap-1.0.0
-
-  - it: should handle different issuer types
-    set:
-      certificate:
-        enabled: true
-        hostname: "api.example.com"
-        issuerRef:
-          name: "ca-issuer"
-          kind: "Issuer"
-        renewBefore: "168h"
-        duration: "8760h"
-    asserts:
-      - equal:
-          path: spec.issuerRef.name
-          value: "ca-issuer"
-      - equal:
-          path: spec.issuerRef.kind
-          value: "Issuer"
-      - equal:
-          path: spec.commonName
-          value: "api.example.com"
-      - equal:
-          path: spec.dnsNames[0]
-          value: "api.example.com"
-
-  - it: should handle ClusterIssuer
-    set:
-      certificate:
-        enabled: true
-        hostname: "secure.example.com"
-        issuerRef:
-          name: "letsencrypt-staging"
-          kind: "ClusterIssuer"
-        renewBefore: "360h"
-        duration: "1440h"
-    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: Certificate
       - equal:
           path: spec.issuerRef.name
           value: "letsencrypt-staging"
       - equal:
           path: spec.issuerRef.kind
-          value: "ClusterIssuer"
-
-  - it: should handle different renewal and duration settings
-    set:
-      certificate:
-        enabled: true
-        hostname: "short-lived.example.com"
-        issuerRef:
-          name: "test-issuer"
-          kind: "Issuer"
-        renewBefore: "24h"
-        duration: "168h"
-    asserts:
-      - equal:
-          path: spec.renewBefore
-          value: "24h"
-      - equal:
-          path: spec.duration
-          value: "168h"
-
-  - it: should handle wildcard certificates
-    set:
-      certificate:
-        enabled: true
-        hostname: "*.example.com"
-        issuerRef:
-          name: "dns-issuer"
-          kind: "ClusterIssuer"
-        renewBefore: "720h"
-        duration: "2160h"
-    asserts:
+          value: "Issuer"
       - equal:
           path: spec.commonName
-          value: "*.example.com"
-      - equal:
-          path: spec.dnsNames[0]
-          value: "*.example.com"
+          value: "iap.staging.com"
+      - contains:
+          path: spec.dnsNames
+          content: "iap.staging.com"
+      - contains:
+          path: spec.dnsNames
+          content: "iap-0.staging.com"
+      - contains:
+          path: spec.dnsNames
+          content: "iap-1.staging.com"
+      - contains:
+          path: spec.dnsNames
+          content: "iap-2.staging.com"
+      - lengthEqual:
+          path: spec.dnsNames
+          count: 4
 
-  - it: should use fullname template for naming
+  - it: should handle zero replicas
     set:
-      certificate:
-        enabled: true
-        hostname: "test.example.com"
-        issuerRef:
-          name: "test-issuer"
-          kind: "Issuer"
-        renewBefore: "720h"
-        duration: "2160h"
-      fullnameOverride: "custom-app-name"
+      certificate.enabled: true
+      certificate.issuerRef.name: "self-signed"
+      certificate.issuerRef.kind: "ClusterIssuer"
+      certificate.commonName: "iap.local"
+      certificate.domain: "local"
+      certificate.renewBefore: "24h"
+      certificate.duration: "168h"
+      replicaCount: 0
+      fullnameOverride: "zero-replica-iap"
     asserts:
-      - equal:
-          path: metadata.name
-          value: "custom-app-name-tls"
-      - equal:
-          path: spec.secretName
-          value: "custom-app-name-tls-secret"
-
-  - it: should handle special characters in hostname
-    set:
-      certificate:
-        enabled: true
-        hostname: "test-app.staging.example.com"
-        issuerRef:
-          name: "staging-issuer"
-          kind: "ClusterIssuer"
-        renewBefore: "720h"
-        duration: "2160h"
-    asserts:
+      - hasDocuments:
+          count: 1
       - equal:
           path: spec.commonName
-          value: "test-app.staging.example.com"
-      - equal:
-          path: spec.dnsNames[0]
-          value: "test-app.staging.example.com"
+          value: "iap.local"
+      - contains:
+          path: spec.dnsNames
+          content: "iap.local"
+      - lengthEqual:
+          path: spec.dnsNames
+          count: 1
 
-  - it: should handle long duration certificates
+  - it: should include proper labels
     set:
-      certificate:
-        enabled: true
-        hostname: "long-term.example.com"
-        issuerRef:
-          name: "ca-issuer"
-          kind: "Issuer"
-        renewBefore: "8760h"
-        duration: "87600h"
+      certificate.enabled: true
+      certificate.issuerRef.name: "test-issuer"
+      certificate.issuerRef.kind: "ClusterIssuer"
+      certificate.commonName: "test.com"
+      certificate.domain: "test.com"
+      certificate.renewBefore: "720h"
+      certificate.duration: "2160h"
+      replicaCount: 1
+    release:
+      name: iap
     asserts:
-      - equal:
-          path: spec.renewBefore
-          value: "8760h"
-      - equal:
-          path: spec.duration
-          value: "87600h"
+      - hasDocuments:
+          count: 1
+      - isSubset:
+          path: metadata.labels
+          content:
+            app.kubernetes.io/instance: iap
+            app.kubernetes.io/managed-by: Helm
+            app.kubernetes.io/name: iap
+            app.kubernetes.io/version: 6.0.4
+            helm.sh/chart: iap-1.0.0
 
-  - it: should handle different chart names
+  - it: should handle string replica count
     set:
-      certificate:
-        enabled: true
-        hostname: "chart-test.example.com"
-        issuerRef:
-          name: "test-issuer"
-          kind: "Issuer"
-        renewBefore: "720h"
-        duration: "2160h"
-      nameOverride: ""
-      fullnameOverride: ""
-    chart:
-      name: "my-custom-chart"
-      version: "1.0.0"
+      certificate.enabled: true
+      certificate.issuerRef.name: "test-issuer"
+      certificate.issuerRef.kind: "ClusterIssuer"
+      certificate.commonName: "test.com"
+      certificate.domain: "test.com"
+      certificate.renewBefore: "720h"
+      certificate.duration: "2160h"
+      replicaCount: "2"
+      fullnameOverride: "string-replica-iap"
     asserts:
-      - matchRegex:
-          path: metadata.name
-          pattern: ".*-tls$"
-      - matchRegex:
-          path: spec.secretName
-          pattern: ".*-tls-secret$"
+      - hasDocuments:
+          count: 1
+      - contains:
+          path: spec.dnsNames
+          content: "test.com"
+      - contains:
+          path: spec.dnsNames
+          content: "string-replica-iap-0.test.com"
+      - contains:
+          path: spec.dnsNames
+          content: "string-replica-iap-1.test.com"
+      - lengthEqual:
+          path: spec.dnsNames
+          count: 3
+
+  - it: should handle different issuer kinds
+    set:
+      certificate.enabled: true
+      certificate.issuerRef.name: "ca-issuer"
+      certificate.issuerRef.kind: "Issuer"
+      certificate.commonName: "ca.example.com"
+      certificate.domain: "example.com"
+      certificate.renewBefore: "360h"
+      certificate.duration: "1080h"
+      replicaCount: 1
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: spec.issuerRef.kind
+          value: "Issuer"
+      - equal:
+          path: spec.issuerRef.name
+          value: "ca-issuer"
+
+  - it: should properly quote commonName
+    set:
+      certificate.enabled: true
+      certificate.issuerRef.name: "test-issuer"
+      certificate.issuerRef.kind: "ClusterIssuer"
+      certificate.commonName: "special-chars.example.com"
+      certificate.domain: "example.com"
+      certificate.renewBefore: "720h"
+      certificate.duration: "2160h"
+      replicaCount: 1
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: spec.commonName
+          value: "special-chars.example.com"
+      - contains:
+          path: spec.dnsNames
+          content: "special-chars.example.com"

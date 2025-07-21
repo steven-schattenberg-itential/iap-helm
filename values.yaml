@@ -3,112 +3,174 @@
 ---
 # Default values for iap.
 
-replicaCount: 3
-
+# -- The number of pods to start
+replicaCount: 2
+# -- The port that the application will run on
 applicationPort: 3443
+# -- Toggle to enable TLS features and configuration.
 useTLS: true
+# -- Toggle a volume mount which contains adapter code. When this is set to false it is assumed that
+# all adapters will be layered into the Itential provided container.
 mountAdapterVolume: false
+# -- Toggle a volume with will contain log files. Not required if log data is being captured from
+# Stdout.
 mountLogVolume: false
 
 certManager:
+  # -- Toggles the use of cert-manager for managing the TLS certificates. Setting this to false
+  # means that creation of the TLS certificates will be manual and outside of the chart.
   enabled: true
 
-# Optional dependency to generate a static external DNS name
 external-dns:
+  # -- Optional dependency to generate a static external DNS name
   enabled: false
 
 # The Itential image to use, its version, and its location
+# The image name will depend on the entitlement that has been granted.
 image:
-  repository: 497639811223.dkr.ecr.us-east-2.amazonaws.com/itential-platform-ecm-gm
+  # -- The image repository
+  repository: 497639811223.dkr.ecr.us-east-2.amazonaws.com/itential-platform
+  # -- The image pull policy
   pullPolicy: IfNotPresent
+  # -- The image tag
   tag:
 
-# The secrets object used to pull the image from the repo
+# -- The secrets object used to pull the image from the repo
 imagePullSecrets: []
 
 serviceAccount:
   name:
 
+# The issuer to be used if using cert-manager to generate the TLS certificates
 issuer:
-  enabled: false
+  # -- Toggle to use the issuer object or not
+  enabled: true
+  # -- The name of this issuer.
   name: iap-ca-issuer
+  # -- The CA secret to be used by this issuer when creating TLS certificates.
   caSecretName:
 
+# The certificate object to use by cert-manager to generate the TLS certificates.
 certificate:
+  # -- Toggle to use the certificate object or not
   enabled: false
   issuerRef:
+    # -- The name of the issuer with the CA reference.
     name: iap-ca-issuer
+    # -- The issuer type
     kind: Issuer
-  renewBefore:
-  duration:
-  hostname:
+  # -- Specifies how long before the certificate expires that cert-manager should try to renew.
+  renewBefore: 48h
+  # -- Specifies how long the certificate should be valid for (its lifetime).
+  duration: 2160h
+  # -- The Common Name to use when creating certificates
+  commonName: iap.example.com
+  # -- The domain to use when creating certificates. This will be used by the templates to build a
+  # complete list of hosts to enable direct access to individual pods. Some UI actions in Itential
+  # require direct access to pods.
+  domain: example.com
 
-# This is used to configure the storage class object which governs
-# how the mounted volumes are created.
+# Used to configure the storage class object which governs how the mounted volumes are created.
 storageClass:
+  # -- Toggle the use of storageClass
   enabled: true
+  # -- The name of the storageClass
   name: "iap-ebs-gp3"
+  # -- Specifies which volume plugin provisions the storage
   provisioner: ""
+  # -- What happens to PersistentVolumes when released. Itential recommends "retain".
   reclaimPolicy: "Retain"
+  # -- Controls when volume binding occurs
   volumeBindingMode: "WaitForFirstConsumer"
+  # -- Key-value pairs passed to the provisioner
   parameters:
 
-# Persistent volumes and persitent volume claims. These are used for Itential
-# application logs and for Itential adapters.
+# Persistent volumes and persistent volume claims. These are used for Itential application logs and
+# for Itential adapters.
 persistentVolumeClaims:
+  # -- Toggle the use of persistentVolumeClaims
   enabled: true
-  # This represents the claim for the persistence for the adapters and other
-  # custom applications that may have been developed by the customer.
+  # -- This represents the claim for the persistence for the adapters and other custom applications
+  # that may have been developed by the customer.
   assetClaim:
-    # The requested amount of storage
+    # -- The requested amount of storage
     storage: "10Gi"
-  # This represents the claim for the persistence for the log files created and
-  # written to by the IAP application
+  # -- This represents the claim for the persistence for the log files created and written to by the
+  # IAP application.
   logClaim:
-    # The requested amount of storage
+    # -- The requested amount of storage
     storage: "10Gi"
 
 # The Kubernetes service object for this application
 service:
-  # The service type
+  # -- The service type.
   type: "ClusterIP"
-  # The name of this Kubernetes service object
+  # -- The name of this Kubernetes service object.
   name: "iap-service"
-  # The port that this service object is listening on
+  # -- The port that this service object is listening on.
   port: 443
 
 # The Kubernetes ingress object for this application.
 ingress:
-  # enabled The ingress object can be disabled and will not be created with this set to false
+  # -- The ingress object can be disabled and will not be created with this set to false
   enabled: true
-  # name The name of this Kubernetes ingress object
+  # -- The name of this Kubernetes ingress object
   name: "iap-ingress"
-  # className The ingress controller class name
-  className: ""
-  # annotations The annotations for this ingress object. These are passed into the template
-  # as is and will render as you see here.
+  # -- The ingress controller class name
+  className: "alb"
+  # -- The ingress controller path type
+  pathType: Prefix
+  # Load balancer configuration
+  loadBalancer:
+    # -- Enable a load balancer that will distribute request to all Itential pods
+    enabled: true
+    # -- The Load balancer host name
+    host: iap.pet-sbx.itential.io
+    # -- The path
+    path: /
+  # Direct access configuration
+  directAccess:
+    # -- Enable direct access to all Itential pods.
+    enabled: true
+    # -- The base domain for each Itential pod, used by the templates to create host names.
+    baseDomain: pet-sbx.itential.io
+    # -- The path
+    path: /
+  # -- The annotations for this ingress object. These are passed into the template as is and will
+  # render as you see here. Itential leveraged AWS ALB but others should work.
   annotations:
-  # hosts The list of hosts for this ingress and their associated properties
-  hosts:
-    - host: "itential.example.com"
-      paths:
-        - path: "/"
-          pathType: "Prefix"
+    alb.ingress.kubernetes.io/backend-protocol: "HTTPS"
+    alb.ingress.kubernetes.io/healthcheck-path: "/health/status"
+    alb.ingress.kubernetes.io/healthcheck-port: "3443"
+    alb.ingress.kubernetes.io/healthcheck-protocol: "HTTPS"
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "15"
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: "5"
+    alb.ingress.kubernetes.io/healthy-threshold-count: "2"
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/load-balancer-attributes: idle_timeout.timeout_seconds=60
+    alb.ingress.kubernetes.io/load-balancer-name: "itential-iap-lb"
+    alb.ingress.kubernetes.io/scheme: "internet-facing"
+    alb.ingress.kubernetes.io/success-codes: "200"
+    alb.ingress.kubernetes.io/target-type: "ip"
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: "2"
+  # TLS is terminated at the statefulset pod by design.
   tls: []
 
 statefulset:
   enabled: true
 
+# -- Additional pod annotations
 podAnnotations: {}
+# -- Additional pod labels
 podLabels: {}
-securityContext: {}
-
-# The pods will mount some persistent volumes. These settings
+# -- Additional pod security context. The pods will mount some persistent volumes. These settings
 # allow for that to happen.
 podSecurityContext:
   fsGroup: 1001
   runAsUser: 1001
   runAsNonRoot: true
+# -- Additional security context
+securityContext: {}
 
 # Container resources
 resources:
@@ -154,21 +216,19 @@ startupProbe:
   successThreshold: 1
   path: "/health/status"
 
-# Additional volumes to output on the Statefulset definition.
+# -- Additional volumes to output on the Statefulset definition.
 volumes: []
 
-# Additional volumeMounts to output on the Statefulset definition.
+# -- Additional volumeMounts to output on the Statefulset definition.
 volumeMounts: []
 
-#nodeSelector:
-#  itential.io/role: "iap-p"
+# -- Additional nodeSelectors
+nodeSelector: {}
 
-#tolerations:
-#  - effect: "NoSchedule"
-#    key: "itential.io/role"
-#    operator: "Equal"
-#    value: "iap-p"
+# -- Additonal tolerations
+tolerations: []
 
+# -- Additional affinities
 affinity: {}
 
 # Configuration properties for Itential Automation Platform.
@@ -243,10 +303,10 @@ env:
   #############################
   # MONGO DATABASE CONNECTION #
   #############################
-  # Instructs the MongoDB driver to use the configured username/password when connecting to MongoDB.
+  # -- Instructs the MongoDB driver to use the provided user/password when connecting to MongoDB.
   ITENTIAL_MONGO_AUTH_ENABLED: "true"
 
-  # The username to use when connecting to MongoDB.
+  # -- The username to use when connecting to MongoDB.
   ITENTIAL_MONGO_USER: "itential"
 
   # The password to use when connecting to MongoDB.
@@ -258,17 +318,17 @@ env:
   # If true, the server will not check if it is connecting to a compatible MongoDB version.
   # ITENTIAL_MONGO_BYPASS_VERSION_CHECK: "true"
 
-  # The name of the MongoDB logical database to connect to.
+  # -- The name of the MongoDB logical database to connect to.
   ITENTIAL_MONGO_DB_NAME: "itential"
 
   # The MongoDB connection string. For a replica set this will include all members of the
   # replica set. For Mongo Atlas this will be the SRV connection format.
   # ITENTIAL_MONGO_URL: ""
 
-  # Instruct the MongoDB driver to use TLS protocols when connecting to the database.
+  # -- Instruct the MongoDB driver to use TLS protocols when connecting to the database.
   ITENTIAL_MONGO_TLS_ENABLED: "false"
 
-  # If true, disables the validation checks for TLS certificates on other servers in the cluster
+  # -- If true, disables the validation checks for TLS certificates on other servers in the cluster
   # and allows the use of invalid or self-signed certificates to connect.
   ITENTIAL_MONGO_TLS_ALLOW_INVALID_CERTIFICATES: "false"
 
@@ -286,7 +346,7 @@ env:
   # The Redis keyspace (database number) to use for the connection.
   # ITENTIAL_REDIS_DB: ""
 
-  # The username to use when connecting to Redis.
+  # -- The username to use when connecting to Redis.
   ITENTIAL_REDIS_USERNAME: "itential"
 
   # The password to use when connecting to Redis.
@@ -298,10 +358,10 @@ env:
   # The maximum number of times to retry writing a heartbeat message to Redis from a service.
   # ITENTIAL_REDIS_MAX_HEARTBEAT_WRITE_RETRIES: "20"
 
-  # The hostname of the Redis server. Not used when connecting to Redis Sentinels.
-  ITENTIAL_REDIS_HOST: ""
+  # -- The hostname of the Redis server. Not used when connecting to Redis Sentinels.
+  ITENTIAL_REDIS_HOST: "redis.example.com"
 
-  # The port to use when connecting to this Redis instance.
+  # -- The port to use when connecting to this Redis instance.
   ITENTIAL_REDIS_PORT: "6379"
 
   # The username to use when authenticating with a Redis Sentinel cluster.

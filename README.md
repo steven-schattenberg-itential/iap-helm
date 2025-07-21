@@ -6,7 +6,7 @@ This repo contains helm charts for running Itential Automation Platform in Kuber
 
 The chart will not install the Redis and MongoDB dependencies of the IAP application. The chart
 assumes that those are running, configured, and bootstrapped with all necessary data. The
-application is installed using a Kubernetes statefulset. It also includes persistent volume claims,
+application is installed using a Kubernetes Statefulset. It also includes persistent volume claims,
 ingress, and other Kubernetes objects suitable to run the application.
 
 This chart is optimized for Itential version P6 and beyond and will not work with older Itential
@@ -28,6 +28,11 @@ helm install iap . -f values.yaml --set image.tag=6.0.4
 
 ### Requirements & Dependencies
 
+| Repository | Name | Version |
+|:-----------|:-----|:--------|
+| https://charts.jetstack.io | cert-manager | 1.12.3 |
+| https://kubernetes-sigs.github.io/external-dns/ | external-dns | 1.17.0 |
+
 #### Secrets
 
 The chart assumes the following secrets, they are not included in the Chart.
@@ -40,7 +45,8 @@ This is the secret that will pull the image from the Itential ECR. Name to be de
 ##### itential-platform-secrets
 
 This secret contains several sensitive values that the application may use. They are loaded into the
-pod as environment variables. Some are optional and depend on your implementation.
+pod as environment variables. Some are optional and depend on your implementation. The creation of
+this secret is left out of the chart to allow for flexibility with its creation.
 
 | Secret Key | Description | Required? |
 |:-----------|:------------|:----------|
@@ -93,7 +99,7 @@ For more information see the [ExternalDNS project](https://github.com/kubernetes
 | Name | Type | Description |
 |:-----|:-----|:------------|
 | iap-logs-volume | Persistent Volume Claim | A persistent volume claim to mount a directory to write IAP log files to |
-| iap-assest-volume | Persistent Volume Claim | A persistent volume claim to mount a directory that includes adapters and apps |
+| iap-asset-volume | Persistent Volume Claim | A persistent volume claim to mount a directory that includes adapters and apps |
 
 ### How to construct the iap-asset-volume
 
@@ -113,3 +119,71 @@ then be mounted in the container.
 
 This will be correctly translated inside the container to the appropriate directories for IAP to
 understand.
+
+## Values
+
+| Key | Type | Default | Description |
+|:----|:-----|:--------|:------------|
+| affinity | object | `{}` | Additional affinities |
+| applicationPort | int | `3443` | The port that the application will run on |
+| certManager.enabled | bool | `true` | Toggles the use of cert-manager for managing the TLS certificates. Setting this to false means that creation of the TLS certificates will be manual and outside of the chart. |
+| certificate.commonName | string | `"iap.example.com"` | The Common Name to use when creating certificates |
+| certificate.domain | string | `"example.com"` | The domain to use when creating certificates. This will be used by the templates to build a complete list of hosts to enable direct access to individual pods. Some UI actions in Itential require direct access to pods. |
+| certificate.duration | string | `"2160h"` | Specifies how long the certificate should be valid for (its lifetime). |
+| certificate.enabled | bool | `false` | Toggle to use the certificate object or not |
+| certificate.issuerRef.kind | string | `"Issuer"` | The issuer type |
+| certificate.issuerRef.name | string | `"iap-ca-issuer"` | The name of the issuer with the CA reference. |
+| certificate.renewBefore | string | `"48h"` | Specifies how long before the certificate expires that cert-manager should try to renew. |
+| env.ITENTIAL_MONGO_AUTH_ENABLED | string | `"true"` | Instructs the MongoDB driver to use the provided user/password when connecting to MongoDB. |
+| env.ITENTIAL_MONGO_DB_NAME | string | `"itential"` | The name of the MongoDB logical database to connect to. |
+| env.ITENTIAL_MONGO_TLS_ALLOW_INVALID_CERTIFICATES | string | `"false"` | If true, disables the validation checks for TLS certificates on other servers in the cluster and allows the use of invalid or self-signed certificates to connect. |
+| env.ITENTIAL_MONGO_TLS_ENABLED | string | `"false"` | Instruct the MongoDB driver to use TLS protocols when connecting to the database. |
+| env.ITENTIAL_MONGO_USER | string | `"itential"` | The username to use when connecting to MongoDB. |
+| env.ITENTIAL_REDIS_HOST | string | `"redis.example.com"` | The hostname of the Redis server. Not used when connecting to Redis Sentinels. |
+| env.ITENTIAL_REDIS_PORT | string | `"6379"` | The port to use when connecting to this Redis instance. |
+| env.ITENTIAL_REDIS_USERNAME | string | `"itential"` | The username to use when connecting to Redis. |
+| external-dns.enabled | bool | `false` | Optional dependency to generate a static external DNS name |
+| image.pullPolicy | string | `"IfNotPresent"` | The image pull policy |
+| image.repository | string | `"497639811223.dkr.ecr.us-east-2.amazonaws.com/itential-platform"` | The image repository |
+| image.tag | string | `nil` | The image tag |
+| imagePullSecrets | list | `[]` | The secrets object used to pull the image from the repo |
+| ingress.annotations | object | `{"alb.ingress.kubernetes.io/backend-protocol":"HTTPS","alb.ingress.kubernetes.io/healthcheck-interval-seconds":"15","alb.ingress.kubernetes.io/healthcheck-path":"/health/status","alb.ingress.kubernetes.io/healthcheck-port":"3443","alb.ingress.kubernetes.io/healthcheck-protocol":"HTTPS","alb.ingress.kubernetes.io/healthcheck-timeout-seconds":"5","alb.ingress.kubernetes.io/healthy-threshold-count":"2","alb.ingress.kubernetes.io/listen-ports":"[{\"HTTPS\": 443}]","alb.ingress.kubernetes.io/load-balancer-attributes":"idle_timeout.timeout_seconds=60","alb.ingress.kubernetes.io/load-balancer-name":"itential-iap-lb","alb.ingress.kubernetes.io/scheme":"internet-facing","alb.ingress.kubernetes.io/success-codes":"200","alb.ingress.kubernetes.io/target-type":"ip","alb.ingress.kubernetes.io/unhealthy-threshold-count":"2"}` | The annotations for this ingress object. These are passed into the template as is and will render as you see here. Itential leveraged AWS ALB but others should work. |
+| ingress.className | string | `"alb"` | The ingress controller class name |
+| ingress.directAccess.baseDomain | string | `"pet-sbx.itential.io"` | The base domain for each Itential pod, used by the templates to create host names. |
+| ingress.directAccess.enabled | bool | `true` | Enable direct access to all Itential pods. |
+| ingress.directAccess.path | string | `"/"` | The path |
+| ingress.enabled | bool | `true` | The ingress object can be disabled and will not be created with this set to false |
+| ingress.loadBalancer.enabled | bool | `true` | Enable a load balancer that will distribute request to all Itential pods |
+| ingress.loadBalancer.host | string | `"iap.pet-sbx.itential.io"` | The Load balancer host name |
+| ingress.loadBalancer.path | string | `"/"` | The path |
+| ingress.name | string | `"iap-ingress"` | The name of this Kubernetes ingress object |
+| ingress.pathType | string | `"Prefix"` | The ingress controller path type |
+| issuer.caSecretName | string | `nil` | The CA secret to be used by this issuer when creating TLS certificates. |
+| issuer.enabled | bool | `true` | Toggle to use the issuer object or not |
+| issuer.name | string | `"iap-ca-issuer"` | The name of this issuer. |
+| mountAdapterVolume | bool | `false` | Toggle a volume mount which contains adapter code. When this is set to false it is assumed that all adapters will be layered into the Itential provided container. |
+| mountLogVolume | bool | `false` | Toggle a volume with will contain log files. Not required if log data is being captured from Stdout. |
+| nodeSelector | object | `{}` | Additional nodeSelectors |
+| persistentVolumeClaims.assetClaim | object | `{"storage":"10Gi"}` | This represents the claim for the persistence for the adapters and other custom applications that may have been developed by the customer. |
+| persistentVolumeClaims.assetClaim.storage | string | `"10Gi"` | The requested amount of storage |
+| persistentVolumeClaims.enabled | bool | `true` | Toggle the use of persistentVolumeClaims |
+| persistentVolumeClaims.logClaim | object | `{"storage":"10Gi"}` | This represents the claim for the persistence for the log files created and written to by the IAP application. |
+| persistentVolumeClaims.logClaim.storage | string | `"10Gi"` | The requested amount of storage |
+| podAnnotations | object | `{}` | Additional pod annotations |
+| podLabels | object | `{}` | Additional pod labels |
+| podSecurityContext | object | `{"fsGroup":1001,"runAsNonRoot":true,"runAsUser":1001}` | Additional pod security context. The pods will mount some persistent volumes. These settings allow for that to happen. |
+| replicaCount | int | `2` | The number of pods to start |
+| securityContext | object | `{}` | Additional security context |
+| service.name | string | `"iap-service"` | The name of this Kubernetes service object. |
+| service.port | int | `443` | The port that this service object is listening on. |
+| service.type | string | `"ClusterIP"` | The service type. |
+| storageClass.enabled | bool | `true` | Toggle the use of storageClass |
+| storageClass.name | string | `"iap-ebs-gp3"` | The name of the storageClass |
+| storageClass.parameters | string | `nil` | Key-value pairs passed to the provisioner |
+| storageClass.provisioner | string | `""` | Specifies which volume plugin provisions the storage |
+| storageClass.reclaimPolicy | string | `"Retain"` | What happens to PersistentVolumes when released. Itential recommends "retain". |
+| storageClass.volumeBindingMode | string | `"WaitForFirstConsumer"` | Controls when volume binding occurs |
+| tolerations | list | `[]` | Additional tolerations |
+| useTLS | bool | `true` | Toggle to enable TLS features and configuration. |
+| volumeMounts | list | `[]` | Additional volumeMounts to output on the Statefulset definition. |
+| volumes | list | `[]` | Additional volumes to output on the Statefulset definition. |
