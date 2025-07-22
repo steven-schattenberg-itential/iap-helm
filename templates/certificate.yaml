@@ -15,9 +15,13 @@ spec:
   issuerRef:
     name: {{ .Values.certificate.issuerRef.name }}
     kind: {{ .Values.certificate.issuerRef.kind }}
-  commonName: {{ .Values.certificate.hostname | quote }}
+  commonName: {{ .Values.certificate.commonName | quote }}
   dnsNames:
-    - {{ .Values.certificate.hostname | quote }}
+    - {{ .Values.certificate.commonName | quote }}
+    {{/* This will add DNS names for each of the pods for direct access */}}
+    {{- range $i := until (.Values.replicaCount | int) }}
+    - {{ include "iap.fullname" $ }}-{{ $i }}.{{ $.Values.certificate.domain }}
+    {{- end }}
   renewBefore: {{ .Values.certificate.renewBefore }}
   duration: {{ .Values.certificate.duration }}
 {{- end -}}

@@ -2,337 +2,898 @@ suite: test ingress template
 templates:
   - ingress.yaml
 tests:
-  - it: should not render when ingress is disabled
+  - it: should not create ingress when disabled
     set:
-      ingress.enabled: false
+      ingress:
+        enabled: false
     asserts:
       - hasDocuments:
           count: 0
 
-  - it: should render basic Ingress when enabled
+  - it: should create ingress when enabled
     set:
       ingress:
         enabled: true
-        name: "test-ingress"
-        className: "nginx"
-        hosts:
-          - host: "example.com"
-            paths:
-              - path: "/"
-                pathType: "Prefix"
+        className: alb
+        loadBalancer:
+          enabled: true
+          host: test.example.com
+          path: /
+        directAccess:
+          enabled: false
       service:
-        name: "test-service"
-        port: 80
-    capabilities:
-      kubeVersion: "1.25.0"
+        port: 443
+      replicaCount: 3
     asserts:
       - hasDocuments:
           count: 1
       - isKind:
           of: Ingress
-      - isAPIVersion:
-          of: networking.k8s.io/v1
       - equal:
           path: metadata.name
-          value: "test-ingress"
+          value: RELEASE-NAME-iap-ingress
+
+  - it: should have correct API version and kind
+    set:
+      ingress:
+        enabled: true
+        loadBalancer:
+          enabled: true
+          host: test.example.com
+        directAccess:
+          enabled: false
+      service:
+        port: 443
+      replicaCount: 3
+    asserts:
+      - equal:
+          path: apiVersion
+          value: networking.k8s.io/v1
+      - equal:
+          path: kind
+          value: Ingress
+
+  - it: should include labels from helper function
+    set:
+      ingress:
+        enabled: true
+        loadBalancer:
+          enabled: true
+          host: test.example.com
+        directAccess:
+          enabled: false
+      service:
+        port: 443
+      replicaCount: 3
+    asserts:
+      - exists:
+          path: metadata.labels
+      - exists:
+          path: metadata.labels["app.kubernetes.io/name"]
+      - exists:
+          path: metadata.labels["app.kubernetes.io/instance"]
+
+  - it: should include annotations when provided
+    set:
+      ingress:
+        enabled: true
+        annotations:
+          alb.ingress.kubernetes.io/scheme: internet-facing
+          alb.ingress.kubernetes.io/target-type: ip
+          custom.annotation/test: "value"
+        loadBalancer:
+          enabled: true
+          host: test.example.com
+        directAccess:
+          enabled: false
+      service:
+        port: 443
+      replicaCount: 3
+    asserts:
+      - equal:
+          path: metadata.annotations["alb.ingress.kubernetes.io/scheme"]
+          value: internet-facing
+      - equal:
+          path: metadata.annotations["alb.ingress.kubernetes.io/target-type"]
+          value: ip
+      - equal:
+          path: metadata.annotations["custom.annotation/test"]
+          value: "value"
+
+  - it: should set ingressClassName when provided
+    set:
+      ingress:
+        enabled: true
+        className: alb
+        loadBalancer:
+          enabled: true
+          host: test.example.com
+        directAccess:
+          enabled: false
+      service:
+        port: 443
+      replicaCount: 3
+    asserts:
       - equal:
           path: spec.ingressClassName
-          value: "nginx"
-      - equal:
-          path: spec.rules[0].host
-          value: "example.com"
-      - equal:
-          path: spec.rules[0].http.paths[0].path
-          value: "/"
-      - equal:
-          path: spec.rules[0].http.paths[0].pathType
-          value: "Prefix"
-      - equal:
-          path: spec.rules[0].http.paths[0].backend.service.name
-          value: "test-service"
-      - equal:
-          path: spec.rules[0].http.paths[0].backend.service.port.number
-          value: 80
+          value: alb
 
-  - it: should include iap labels in metadata
+### TLS Tests
+  - it: should include TLS configuration when provided
     set:
       ingress:
         enabled: true
-        name: "test-ingress"
-        className: "nginx"
-        hosts:
-          - host: "example.com"
-            paths:
-              - path: "/"
-      service:
-        name: "test-service"
-        port: 80
-    asserts:
-      - isSubset:
-          path: metadata.labels
-          content:
-            app.kubernetes.io/instance: RELEASE-NAME
-            app.kubernetes.io/managed-by: Helm
-            app.kubernetes.io/name: iap
-            app.kubernetes.io/version: 6.0.4
-            helm.sh/chart: iap-1.0.0
-
-  - it: should render annotations when provided
-    set:
-      ingress:
-        enabled: true
-        name: "annotated-ingress"
-        className: "nginx"
-        annotations:
-          nginx.ingress.kubernetes.io/rewrite-target: "/"
-          nginx.ingress.kubernetes.io/ssl-redirect: "true"
-          cert-manager.io/cluster-issuer: "letsencrypt-prod"
-        hosts:
-          - host: "example.com"
-            paths:
-              - path: "/"
-      service:
-        name: "test-service"
-        port: 80
-    asserts:
-      - equal:
-          path: metadata.annotations["nginx.ingress.kubernetes.io/rewrite-target"]
-          value: "/"
-      - equal:
-          path: metadata.annotations["nginx.ingress.kubernetes.io/ssl-redirect"]
-          value: "true"
-      - equal:
-          path: metadata.annotations["cert-manager.io/cluster-issuer"]
-          value: "letsencrypt-prod"
-
-  - it: should not render annotations section when empty
-    set:
-      ingress:
-        enabled: true
-        name: "no-annotations-ingress"
-        className: "nginx"
-        hosts:
-          - host: "example.com"
-            paths:
-              - path: "/"
-      service:
-        name: "test-service"
-        port: 80
-    asserts:
-      - isNull:
-          path: metadata.annotations
-
-  - it: should render TLS configuration when provided
-    set:
-      ingress:
-        enabled: true
-        name: "tls-ingress"
-        className: "nginx"
         tls:
-          - hosts:
-              - "secure.example.com"
-              - "api.example.com"
-            secretName: "example-tls"
-          - hosts:
-              - "admin.example.com"
-            secretName: "admin-tls"
-        hosts:
-          - host: "secure.example.com"
-            paths:
-              - path: "/"
+          - secretName: test-tls-secret
+            hosts:
+              - test.example.com
+              - api.example.com
+          - secretName: another-tls-secret
+            hosts:
+              - another.example.com
+        loadBalancer:
+          enabled: true
+          host: test.example.com
+        directAccess:
+          enabled: false
       service:
-        name: "test-service"
         port: 443
+      replicaCount: 3
     asserts:
-      - equal:
-          path: spec.tls[0].hosts[0]
-          value: "secure.example.com"
-      - equal:
-          path: spec.tls[0].hosts[1]
-          value: "api.example.com"
+      - exists:
+          path: spec.tls
+      - lengthEqual:
+          path: spec.tls
+          count: 2
       - equal:
           path: spec.tls[0].secretName
-          value: "example-tls"
-      - equal:
-          path: spec.tls[1].hosts[0]
-          value: "admin.example.com"
+          value: test-tls-secret
+      - contains:
+          path: spec.tls[0].hosts
+          content: test.example.com
+      - contains:
+          path: spec.tls[0].hosts
+          content: api.example.com
       - equal:
           path: spec.tls[1].secretName
-          value: "admin-tls"
+          value: another-tls-secret
+      - contains:
+          path: spec.tls[1].hosts
+          content: another.example.com
 
-  - it: should not render TLS section when not provided
+  - it: should not include TLS when not provided
     set:
       ingress:
         enabled: true
-        name: "no-tls-ingress"
-        className: "nginx"
-        hosts:
-          - host: "example.com"
-            paths:
-              - path: "/"
+        loadBalancer:
+          enabled: true
+          host: test.example.com
+        directAccess:
+          enabled: false
       service:
-        name: "test-service"
-        port: 80
+        port: 443
+      replicaCount: 3
     asserts:
-      - isNull:
+      - notExists:
           path: spec.tls
 
-  - it: should handle multiple hosts and paths
+  - it: should handle single TLS configuration
     set:
       ingress:
         enabled: true
-        name: "multi-host-ingress"
-        className: "traefik"
-        hosts:
-          - host: "api.example.com"
-            paths:
-              - path: "/v1"
-                pathType: "Prefix"
-              - path: "/v2"
-                pathType: "Exact"
-          - host: "web.example.com"
-            paths:
-              - path: "/"
-                pathType: "Prefix"
-              - path: "/admin"
-                pathType: "Prefix"
+        tls:
+          - secretName: single-tls-secret
+            hosts:
+              - single.example.com
+        loadBalancer:
+          enabled: true
+          host: test.example.com
+        directAccess:
+          enabled: false
       service:
-        name: "multi-service"
-        port: 8080
-    capabilities:
-      kubeVersion: "1.24.0"
+        port: 443
+      replicaCount: 3
     asserts:
+      - exists:
+          path: spec.tls
+      - lengthEqual:
+          path: spec.tls
+          count: 1
+      - equal:
+          path: spec.tls[0].secretName
+          value: single-tls-secret
+      - lengthEqual:
+          path: spec.tls[0].hosts
+          count: 1
+      - equal:
+          path: spec.tls[0].hosts[0]
+          value: single.example.com
+
+### Load balancer tests
+  - it: should create load balancer rule when enabled
+    set:
+      ingress:
+        enabled: true
+        loadBalancer:
+          enabled: true
+          host: lb.example.com
+          path: /
+        directAccess:
+          enabled: false
+      service:
+        port: 443
+      replicaCount: 3
+    asserts:
+      - lengthEqual:
+          path: spec.rules
+          count: 1
       - equal:
           path: spec.rules[0].host
-          value: "api.example.com"
+          value: lb.example.com
       - equal:
           path: spec.rules[0].http.paths[0].path
-          value: "/v1"
+          value: /
       - equal:
           path: spec.rules[0].http.paths[0].pathType
-          value: "Prefix"
+          value: Prefix
       - equal:
-          path: spec.rules[0].http.paths[1].path
-          value: "/v2"
+          path: spec.rules[0].http.paths[0].backend.service.name
+          value: RELEASE-NAME-iap-service
       - equal:
-          path: spec.rules[0].http.paths[1].pathType
-          value: "Exact"
+          path: spec.rules[0].http.paths[0].backend.service.port.number
+          value: 443
+
+  - it: should not create load balancer rule when disabled
+    set:
+      ingress:
+        enabled: true
+        loadBalancer:
+          enabled: false
+        directAccess:
+          enabled: false
+      service:
+        port: 443
+      replicaCount: 3
+    asserts:
+      - lengthEqual:
+          path: spec.rules
+          count: 0
+
+  - it: should use custom path for load balancer
+    set:
+      ingress:
+        enabled: true
+        loadBalancer:
+          enabled: true
+          host: lb.example.com
+          path: /api
+        directAccess:
+          enabled: false
+      service:
+        port: 443
+      replicaCount: 3
+    asserts:
+      - equal:
+          path: spec.rules[0].http.paths[0].path
+          value: /api
+
+  - it: should use default path when not specified
+    set:
+      ingress:
+        enabled: true
+        loadBalancer:
+          enabled: true
+          host: lb.example.com
+        directAccess:
+          enabled: false
+      service:
+        port: 443
+      replicaCount: 3
+    asserts:
+      - equal:
+          path: spec.rules[0].http.paths[0].path
+          value: /
+
+  - it: should use custom pathType
+    set:
+      ingress:
+        enabled: true
+        pathType: Exact
+        loadBalancer:
+          enabled: true
+          host: lb.example.com
+        directAccess:
+          enabled: false
+      service:
+        port: 443
+      replicaCount: 3
+    asserts:
+      - equal:
+          path: spec.rules[0].http.paths[0].pathType
+          value: Exact
+
+  - it: should use default pathType when not specified
+    set:
+      ingress:
+        enabled: true
+        loadBalancer:
+          enabled: true
+          host: lb.example.com
+        directAccess:
+          enabled: false
+      service:
+        port: 443
+      replicaCount: 3
+    asserts:
+      - equal:
+          path: spec.rules[0].http.paths[0].pathType
+          value: Prefix
+
+  - it: should use correct service port
+    set:
+      ingress:
+        enabled: true
+        loadBalancer:
+          enabled: true
+          host: lb.example.com
+        directAccess:
+          enabled: false
+      service:
+        port: 8080
+      replicaCount: 3
+    asserts:
+      - equal:
+          path: spec.rules[0].http.paths[0].backend.service.port.number
+          value: 8080
+
+#### Direct Access
+  - it: should create direct access rules when enabled
+    set:
+      ingress:
+        enabled: true
+        loadBalancer:
+          enabled: false
+        directAccess:
+          enabled: true
+          baseDomain: example.com
+          path: /
+      service:
+        port: 443
+      replicaCount: 3
+    asserts:
+      - lengthEqual:
+          path: spec.rules
+          count: 3
+      - equal:
+          path: spec.rules[0].host
+          value: iap-0.example.com
       - equal:
           path: spec.rules[1].host
-          value: "web.example.com"
+          value: iap-1.example.com
       - equal:
-          path: spec.rules[1].http.paths[0].path
-          value: "/"
-      - equal:
-          path: spec.rules[1].http.paths[1].path
-          value: "/admin"
+          path: spec.rules[2].host
+          value: iap-2.example.com
 
-  - it: should render pathType for Kubernetes 1.18+
+  - it: should not create direct access rules when disabled
     set:
       ingress:
         enabled: true
-        name: "new-k8s-ingress"
-        className: "nginx"
-        hosts:
-          - host: "modern.example.com"
-            paths:
-              - path: "/"
-                pathType: "Prefix"
+        loadBalancer:
+          enabled: false
+        directAccess:
+          enabled: false
       service:
-        name: "modern-service"
-        port: 80
-    capabilities:
-      kubeVersion: "1.18.0"
+        port: 443
+      replicaCount: 3
     asserts:
-      - equal:
-          path: spec.rules[0].http.paths[0].pathType
-          value: "Prefix"
+      - lengthEqual:
+          path: spec.rules
+          count: 0
 
-  - it: should handle different ingress classes
+  - it: should create correct service references for direct access
     set:
       ingress:
         enabled: true
-        name: "traefik-ingress"
-        className: "traefik"
-        hosts:
-          - host: "traefik.example.com"
-            paths:
-              - path: "/"
+        loadBalancer:
+          enabled: false
+        directAccess:
+          enabled: true
+          baseDomain: example.com
       service:
-        name: "traefik-service"
-        port: 3000
-    asserts:
-      - equal:
-          path: spec.ingressClassName
-          value: "traefik"
-
-  - it: should use service variables correctly
-    set:
-      ingress:
-        enabled: true
-        name: "service-test-ingress"
-        className: "nginx"
-        hosts:
-          - host: "service-test.example.com"
-            paths:
-              - path: "/api"
-      service:
-        name: "custom-backend-service"
-        port: 9090
+        port: 443
+      replicaCount: 3
     asserts:
       - equal:
           path: spec.rules[0].http.paths[0].backend.service.name
-          value: "custom-backend-service"
+          value: RELEASE-NAME-iap-service-headless-0
       - equal:
-          path: spec.rules[0].http.paths[0].backend.service.port.number
-          value: 9090
+          path: spec.rules[1].http.paths[0].backend.service.name
+          value: RELEASE-NAME-iap-service-headless-1
+      - equal:
+          path: spec.rules[2].http.paths[0].backend.service.name
+          value: RELEASE-NAME-iap-service-headless-2
 
-  - it: should handle wildcard hosts
+  - it: should use correct ports for direct access
     set:
       ingress:
         enabled: true
-        name: "wildcard-ingress"
-        className: "nginx"
-        hosts:
-          - host: "*.example.com"
-            paths:
-              - path: "/"
-                pathType: "Prefix"
-        tls:
-          - hosts:
-              - "*.example.com"
-            secretName: "wildcard-tls"
+        loadBalancer:
+          enabled: false
+        directAccess:
+          enabled: true
+          baseDomain: example.com
       service:
-        name: "wildcard-service"
-        port: 80
-    capabilities:
-      kubeVersion: "1.25.0"
+        port: 8080
+      replicaCount: 2
     asserts:
       - equal:
-          path: spec.rules[0].host
-          value: "*.example.com"
+          path: spec.rules[0].http.paths[0].backend.service.port.number
+          value: 8080
       - equal:
-          path: spec.tls[0].hosts[0]
-          value: "*.example.com"
+          path: spec.rules[1].http.paths[0].backend.service.port.number
+          value: 8080
 
-  - it: should handle paths without pathType
+  - it: should use custom path for direct access
     set:
       ingress:
         enabled: true
-        name: "no-pathtype-ingress"
-        className: "nginx"
-        hosts:
-          - host: "no-pathtype.example.com"
-            paths:
-              - path: "/"
+        loadBalancer:
+          enabled: false
+        directAccess:
+          enabled: true
+          baseDomain: example.com
+          path: /api
       service:
-        name: "no-pathtype-service"
-        port: 80
-    capabilities:
-      kubeVersion: "1.25.0"
+        port: 443
+      replicaCount: 2
     asserts:
       - equal:
           path: spec.rules[0].http.paths[0].path
-          value: "/"
-      - isNull:
+          value: /api
+      - equal:
+          path: spec.rules[1].http.paths[0].path
+          value: /api
+
+  - it: should use default path when not specified for direct access
+    set:
+      ingress:
+        enabled: true
+        loadBalancer:
+          enabled: false
+        directAccess:
+          enabled: true
+          baseDomain: example.com
+      service:
+        port: 443
+      replicaCount: 2
+    asserts:
+      - equal:
+          path: spec.rules[0].http.paths[0].path
+          value: /
+      - equal:
+          path: spec.rules[1].http.paths[0].path
+          value: /
+
+  - it: should handle single replica for direct access
+    set:
+      ingress:
+        enabled: true
+        loadBalancer:
+          enabled: false
+        directAccess:
+          enabled: true
+          baseDomain: example.com
+      service:
+        port: 443
+      replicaCount: 1
+    asserts:
+      - lengthEqual:
+          path: spec.rules
+          count: 1
+      - equal:
+          path: spec.rules[0].host
+          value: iap-0.example.com
+      - equal:
+          path: spec.rules[0].http.paths[0].backend.service.name
+          value: RELEASE-NAME-iap-service-headless-0
+
+  - it: should handle large replica count for direct access
+    set:
+      ingress:
+        enabled: true
+        loadBalancer:
+          enabled: false
+        directAccess:
+          enabled: true
+          baseDomain: example.com
+      service:
+        port: 443
+      replicaCount: 5
+    asserts:
+      - lengthEqual:
+          path: spec.rules
+          count: 5
+      - equal:
+          path: spec.rules[0].host
+          value: iap-0.example.com
+      - equal:
+          path: spec.rules[4].host
+          value: iap-4.example.com
+      - equal:
+          path: spec.rules[4].http.paths[0].backend.service.name
+          value: RELEASE-NAME-iap-service-headless-4
+
+  - it: should handle zero replicas for direct access
+    set:
+      ingress:
+        enabled: true
+        loadBalancer:
+          enabled: false
+        directAccess:
+          enabled: true
+          baseDomain: example.com
+      service:
+        port: 443
+      replicaCount: 0
+    asserts:
+      - lengthEqual:
+          path: spec.rules
+          count: 0
+
+### Combination tests
+  - it: should create both load balancer and direct access rules
+    set:
+      ingress:
+        enabled: true
+        loadBalancer:
+          enabled: true
+          host: lb.example.com
+          path: /
+        directAccess:
+          enabled: true
+          baseDomain: example.com
+          path: /
+      service:
+        port: 443
+      replicaCount: 3
+    asserts:
+      - lengthEqual:
+          path: spec.rules
+          count: 4  # 1 load balancer + 3 direct access
+      # Load balancer rule
+      - equal:
+          path: spec.rules[0].host
+          value: lb.example.com
+      - equal:
+          path: spec.rules[0].http.paths[0].backend.service.name
+          value: RELEASE-NAME-iap-service
+      # Direct access rules
+      - equal:
+          path: spec.rules[1].host
+          value: iap-0.example.com
+      - equal:
+          path: spec.rules[1].http.paths[0].backend.service.name
+          value: RELEASE-NAME-iap-service-headless-0
+      - equal:
+          path: spec.rules[2].host
+          value: iap-1.example.com
+      - equal:
+          path: spec.rules[2].http.paths[0].backend.service.name
+          value: RELEASE-NAME-iap-service-headless-1
+      - equal:
+          path: spec.rules[3].host
+          value: iap-2.example.com
+      - equal:
+          path: spec.rules[3].http.paths[0].backend.service.name
+          value: RELEASE-NAME-iap-service-headless-2
+
+  - it: should handle different paths for load balancer and direct access
+    set:
+      ingress:
+        enabled: true
+        loadBalancer:
+          enabled: true
+          host: lb.example.com
+          path: /api
+        directAccess:
+          enabled: true
+          baseDomain: example.com
+          path: /direct
+      service:
+        port: 443
+      replicaCount: 2
+    asserts:
+      - equal:
+          path: spec.rules[0].http.paths[0].path
+          value: /api
+      - equal:
+          path: spec.rules[1].http.paths[0].path
+          value: /direct
+      - equal:
+          path: spec.rules[2].http.paths[0].path
+          value: /direct
+
+  - it: should work with complete configuration including TLS
+    set:
+      ingress:
+        enabled: true
+        className: alb
+        pathType: Prefix
+        annotations:
+          alb.ingress.kubernetes.io/scheme: internet-facing
+          alb.ingress.kubernetes.io/target-type: ip
+        tls:
+          - secretName: example-tls
+            hosts:
+              - lb.example.com
+              - iap-0.example.com
+              - iap-1.example.com
+        loadBalancer:
+          enabled: true
+          host: lb.example.com
+          path: /
+        directAccess:
+          enabled: true
+          baseDomain: example.com
+          path: /
+      service:
+        port: 443
+      replicaCount: 2
+    asserts:
+      - equal:
+          path: spec.ingressClassName
+          value: alb
+      - exists:
+          path: metadata.annotations
+      - exists:
+          path: spec.tls
+      - lengthEqual:
+          path: spec.rules
+          count: 3
+      - equal:
+          path: spec.rules[0].host
+          value: lb.example.com
+      - equal:
+          path: spec.rules[1].host
+          value: iap-0.example.com
+      - equal:
+          path: spec.rules[2].host
+          value: iap-1.example.com
+
+  - it: should handle load balancer only configuration
+    set:
+      ingress:
+        enabled: true
+        loadBalancer:
+          enabled: true
+          host: lb.example.com
+        directAccess:
+          enabled: false
+      service:
+        port: 443
+      replicaCount: 3
+    asserts:
+      - lengthEqual:
+          path: spec.rules
+          count: 1
+      - equal:
+          path: spec.rules[0].host
+          value: lb.example.com
+      - equal:
+          path: spec.rules[0].http.paths[0].backend.service.name
+          value: RELEASE-NAME-iap-service
+
+  - it: should handle direct access only configuration
+    set:
+      ingress:
+        enabled: true
+        loadBalancer:
+          enabled: false
+        directAccess:
+          enabled: true
+          baseDomain: example.com
+      service:
+        port: 443
+      replicaCount: 2
+    asserts:
+      - lengthEqual:
+          path: spec.rules
+          count: 2
+      - equal:
+          path: spec.rules[0].host
+          value: iap-0.example.com
+      - equal:
+          path: spec.rules[1].host
+          value: iap-1.example.com
+      - equal:
+          path: spec.rules[0].http.paths[0].backend.service.name
+          value: RELEASE-NAME-iap-service-headless-0
+      - equal:
+          path: spec.rules[1].http.paths[0].backend.service.name
+          value: RELEASE-NAME-iap-service-headless-1
+
+### Edge cases
+  - it: should handle string replica count
+    set:
+      ingress:
+        enabled: true
+        directAccess:
+          enabled: true
+          baseDomain: example.com
+        loadBalancer:
+          enabled: false
+      service:
+        port: 443
+      replicaCount: "3"
+    asserts:
+      - lengthEqual:
+          path: spec.rules
+          count: 3
+      - equal:
+          path: spec.rules[0].host
+          value: iap-0.example.com
+      - equal:
+          path: spec.rules[2].host
+          value: iap-2.example.com
+
+  - it: should handle complex base domain
+    set:
+      ingress:
+        enabled: true
+        directAccess:
+          enabled: true
+          baseDomain: subdomain.example.com
+        loadBalancer:
+          enabled: false
+      service:
+        port: 443
+      replicaCount: 2
+    asserts:
+      - equal:
+          path: spec.rules[0].host
+          value: iap-0.subdomain.example.com
+      - equal:
+          path: spec.rules[1].host
+          value: iap-1.subdomain.example.com
+
+  - it: should handle complex annotations
+    set:
+      ingress:
+        enabled: true
+        annotations:
+          alb.ingress.kubernetes.io/backend-protocol: HTTPS
+          alb.ingress.kubernetes.io/healthcheck-path: /health
+          alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS": 443}]'
+          external-dns.alpha.kubernetes.io/hostname: test.example.com,api.example.com
+        loadBalancer:
+          enabled: true
+          host: test.example.com
+        directAccess:
+          enabled: false
+      service:
+        port: 443
+      replicaCount: 1
+    asserts:
+      - equal:
+          path: metadata.annotations["alb.ingress.kubernetes.io/backend-protocol"]
+          value: HTTPS
+      - equal:
+          path: metadata.annotations["alb.ingress.kubernetes.io/healthcheck-path"]
+          value: /health
+      - equal:
+          path: metadata.annotations["alb.ingress.kubernetes.io/listen-ports"]
+          value: '[{"HTTPS": 443}]'
+      - equal:
+          path: metadata.annotations["external-dns.alpha.kubernetes.io/hostname"]
+          value: test.example.com,api.example.com
+
+  - it: should handle multiple TLS configurations with many hosts
+    set:
+      ingress:
+        enabled: true
+        tls:
+          - secretName: wildcard-tls
+            hosts:
+              - "*.example.com"
+              - example.com
+          - secretName: specific-tls
+            hosts:
+              - api.example.com
+              - app.example.com
+              - admin.example.com
+        loadBalancer:
+          enabled: true
+          host: api.example.com
+        directAccess:
+          enabled: false
+      service:
+        port: 443
+      replicaCount: 1
+    asserts:
+      - lengthEqual:
+          path: spec.tls
+          count: 2
+      - lengthEqual:
+          path: spec.tls[0].hosts
+          count: 2
+      - lengthEqual:
+          path: spec.tls[1].hosts
+          count: 3
+      - contains:
+          path: spec.tls[0].hosts
+          content: "*.example.com"
+      - contains:
+          path: spec.tls[1].hosts
+          content: admin.example.com
+
+  - it: should handle different pathTypes for different rules
+    set:
+      ingress:
+        enabled: true
+        pathType: Exact
+        loadBalancer:
+          enabled: true
+          host: lb.example.com
+        directAccess:
+          enabled: true
+          baseDomain: example.com
+      service:
+        port: 443
+      replicaCount: 2
+    asserts:
+      - equal:
           path: spec.rules[0].http.paths[0].pathType
+          value: Exact
+      - equal:
+          path: spec.rules[1].http.paths[0].pathType
+          value: Exact
+      - equal:
+          path: spec.rules[2].http.paths[0].pathType
+          value: Exact
+
+  - it: should handle high replica count
+    set:
+      ingress:
+        enabled: true
+        directAccess:
+          enabled: true
+          baseDomain: example.com
+        loadBalancer:
+          enabled: false
+      service:
+        port: 443
+      replicaCount: 10
+    asserts:
+      - lengthEqual:
+          path: spec.rules
+          count: 10
+      - equal:
+          path: spec.rules[0].host
+          value: iap-0.example.com
+      - equal:
+          path: spec.rules[9].host
+          value: iap-9.example.com
+      - equal:
+          path: spec.rules[9].http.paths[0].backend.service.name
+          value: RELEASE-NAME-iap-service-headless-9
+
+  - it: should handle unusual port numbers
+    set:
+      ingress:
+        enabled: true
+        loadBalancer:
+          enabled: true
+          host: test.example.com
+        directAccess:
+          enabled: true
+          baseDomain: example.com
+      service:
+        port: 8443
+      replicaCount: 1
+    asserts:
+      - equal:
+          path: spec.rules[0].http.paths[0].backend.service.port.number
+          value: 8443
+      - equal:
+          path: spec.rules[1].http.paths[0].backend.service.port.number
+          value: 8443

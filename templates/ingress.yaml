@@ -1,7 +1,4 @@
 {{- if .Values.ingress.enabled -}}
-{{- $fullName := include "iap.fullname" . -}}
-{{- $svcPort := .Values.service.port -}}
-{{- $svcName := .Values.service.name -}}
 {{/*
 Copyright (c) 2024, Itential, Inc
 GNU General Public License v3.0+ (see LICENSE or https://www.gnu.org/licenses/gpl-3.0.txt)
@@ -10,7 +7,7 @@ GNU General Public License v3.0+ (see LICENSE or https://www.gnu.org/licenses/gp
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ .Values.ingress.name }}
+  name: {{ include "iap.fullname" . }}-ingress
   labels:
     {{- include "iap.labels" . | nindent 4 }}
   {{- with .Values.ingress.annotations }}
@@ -18,7 +15,9 @@ metadata:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 spec:
+  {{- if .Values.ingress.className }}
   ingressClassName: {{ .Values.ingress.className }}
+  {{- end }}
   {{- if .Values.ingress.tls }}
   tls:
     {{- range .Values.ingress.tls }}
@@ -30,20 +29,32 @@ spec:
     {{- end }}
   {{- end }}
   rules:
-    {{- range .Values.ingress.hosts }}
-    - host: {{ .host | quote }}
-      http:
-        paths:
-          {{- range .paths }}
-          - path: {{ .path }}
-            {{- if and .pathType (semverCompare ">=1.18-0" $.Capabilities.KubeVersion.GitVersion) }}
-            pathType: {{ .pathType }}
-            {{- end }}
-            backend:
-              service:
-                name: {{ $svcName }}
-                port:
-                  number: {{ $svcPort }}
-          {{- end }}
-    {{- end }}
+  # Load balanced access
+  {{- if .Values.ingress.loadBalancer.enabled }}
+  - host: {{ .Values.ingress.loadBalancer.host | quote }}
+    http:
+      paths:
+      - backend:
+          service:
+            name: {{ include "iap.fullname" . }}-service
+            port:
+              number: {{ .Values.service.port }}
+        path: {{ .Values.ingress.loadBalancer.path | default "/" }}
+        pathType: {{ .Values.ingress.pathType | default "Prefix" }}
+  {{- end }}
+  # Direct access
+  {{- if .Values.ingress.directAccess.enabled }}
+  {{- range $i := until (.Values.replicaCount | int) }}
+  - host: {{ printf "%s-%d.%s" (include "iap.name" $) $i $.Values.ingress.directAccess.baseDomain | quote }}
+    http:
+      paths:
+      - backend:
+          service:
+            name: {{ include "iap.fullname" $ }}-service-headless-{{ $i }}
+            port:
+              number: {{ $.Values.service.port }}
+        path: {{ $.Values.ingress.directAccess.path | default "/" }}
+        pathType: {{ $.Values.ingress.pathType | default "Prefix" }}
+  {{- end }}
+  {{- end }}
 {{- end }}

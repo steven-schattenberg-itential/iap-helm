@@ -1,0 +1,21 @@
+{{/*
+Copyright (c) 2024, Itential, Inc
+GNU General Public License v3.0+ (see LICENSE or https://www.gnu.org/licenses/gpl-3.0.txt)
+*/}}
+{{- range $i := until (.Values.replicaCount | int) }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $.Values.service.name }}-headless-{{ $i }}
+  labels:
+    {{- include "iap.labels" $ | nindent 4 }}
+spec:
+  selector:
+    {{- include "iap.selectorLabels" $ | nindent 4 }}
+    statefulset.kubernetes.io/pod-name: {{ include "iap.fullname" $ }}-{{ $i }}
+  ports:
+  - name: https
+    port: {{ $.Values.service.port }}
+    targetPort: {{ $.Values.applicationPort }}
+{{- end }}
