@@ -10,18 +10,13 @@ metadata:
   name: {{ .Values.storageClass.name }}
   labels:
     {{- include "iap.labels" . | nindent 4 }}
+    app.kubernetes.io/component: "storageclass"
+  annotations:
+    helm.sh/template-file: "{{ .Template.Name }}"
+    kubernetes.io/description: "Itential Automation Platform StorageClass used for persistent volumes."
 provisioner: {{ .Values.storageClass.provisioner }}
 parameters:
   {{- toYaml .Values.storageClass.parameters | nindent 2 }}
 reclaimPolicy: {{ .Values.storageClass.reclaimPolicy }}
 volumeBindingMode: {{ .Values.storageClass.volumeBindingMode }}
-{{/*
----
-apiVersion: storage.k8s.io/v1
-kind: StorageClass
-metadata:
-  name: local-storage
-provisioner: kubernetes.io/no-provisioner
-volumeBindingMode: WaitForFirstConsumer
-*/}}
 {{- end }}
