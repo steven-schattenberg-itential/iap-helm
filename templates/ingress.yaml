@@ -10,8 +10,11 @@ metadata:
   name: {{ include "iap.fullname" . }}-ingress
   labels:
     {{- include "iap.labels" . | nindent 4 }}
+    app.kubernetes.io/component: "ingress"
   {{- with .Values.ingress.annotations }}
   annotations:
+    helm.sh/template-file: "{{ $.Template.Name }}"
+    kubernetes.io/description: "Itential Automation Platform Ingress. Contains load balanced access and individual access"
     {{- toYaml . | nindent 4 }}
   {{- end }}
 spec:
