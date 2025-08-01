@@ -83,6 +83,16 @@ kubectl get crds | grep cert-manager
 
 For more information see the [Cert Manager project](https://cert-manager.io/).
 
+If `cert-manager` can not be used then the TLS certificates must be manually added to the Kubernetes
+cluster. The Helm templates expect them to be in a secret named `<Chart.name>-tls-secret`. It
+expects the following keys:
+
+| Key | Description |
+|:----|:------------|
+| tls.crt | The TLS certificate that identifies this "server". |
+| tls.key | The private key for this certificate. |
+| ca.crt | The Certificate Authority used to generate these certificates and keys. |
+
 #### DNS
 
 This is an optional requirement.
