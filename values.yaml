@@ -48,7 +48,7 @@ issuer:
   # -- The name of this issuer.
   name: iap-ca-issuer
   # -- The CA secret to be used by this issuer when creating TLS certificates.
-  caSecretName:
+  caSecretName: someSecretName
 
 # The certificate object to use by cert-manager to generate the TLS certificates.
 certificate:
@@ -167,7 +167,7 @@ podLabels: {}
 # allow for that to happen.
 podSecurityContext:
   fsGroup: 1001
-  runAsUser: 1001
+  runAsUser: 100 # run as the 'itential' user
   runAsNonRoot: true
 # -- Additional security context
 securityContext: {}

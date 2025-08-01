@@ -10,6 +10,10 @@ metadata:
   name: {{ $.Values.service.name }}-headless-{{ $i }}
   labels:
     {{- include "iap.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: "service"
+  annotations:
+    helm.sh/template-file: "{{ $.Template.Name }}"
+    kubernetes.io/description: "Itential Automation Platform headless service to individual pods"
 spec:
   selector:
     {{- include "iap.selectorLabels" $ | nindent 4 }}

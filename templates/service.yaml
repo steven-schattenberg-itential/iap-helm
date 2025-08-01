@@ -9,6 +9,10 @@ metadata:
   name: {{ .Values.service.name }}
   labels:
     {{- include "iap.labels" . | nindent 4 }}
+    app.kubernetes.io/component: "service"
+  annotations:
+    helm.sh/template-file: "{{ .Template.Name }}"
+    kubernetes.io/description: "Itential Automation Platform load balanced service"
 spec:
   type: {{ .Values.service.type }}
   ports:
