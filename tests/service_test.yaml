@@ -251,13 +251,37 @@ tests:
           path: metadata.name
           value: "name-override-service"
 
-  - it: should validate port structure
+  - it: should validate port structure with websockets
     set:
       service:
         name: "structure-service"
         type: "ClusterIP"
         port: 80
       applicationPort: 8080
+      useWebSockets: true
+    asserts:
+      - exists:
+          path: spec.ports
+      - lengthEqual:
+          path: spec.ports
+          count: 2
+      - exists:
+          path: spec.ports[0].name
+      - exists:
+          path: spec.ports[0].port
+      - exists:
+          path: spec.ports[0].targetPort
+      - exists:
+          path: spec.ports[0].protocol
+
+  - it: should validate port structure without websockets
+    set:
+      service:
+        name: "structure-service"
+        type: "ClusterIP"
+        port: 80
+      applicationPort: 8080
+      useWebSockets: false
     asserts:
       - exists:
           path: spec.ports
