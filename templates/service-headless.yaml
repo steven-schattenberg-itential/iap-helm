@@ -19,7 +19,7 @@ spec:
     {{- include "iap.selectorLabels" $ | nindent 4 }}
     statefulset.kubernetes.io/pod-name: {{ include "iap.fullname" $ }}-{{ $i }}
   ports:
-  - name: https
-    port: {{ $.Values.service.port }}
-    targetPort: {{ $.Values.applicationPort }}
+    - name: https
+      port: {{ $.Values.service.port }}
+      targetPort: {{ $.Values.applicationPort }}
 {{- end }}

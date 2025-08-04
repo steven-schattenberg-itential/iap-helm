@@ -5,10 +5,14 @@
 
 # -- The number of pods to start
 replicaCount: 2
-# -- The port that the application will run on
+# -- The port that the application will run on.
 applicationPort: 3443
+# -- The port that the Gateway Manager will listen on.
+websocketPort: 8080
 # -- Toggle to enable TLS features and configuration.
 useTLS: true
+# -- Toggle the use of websockets (IAG5 integration)
+useWebSockets: true
 # -- Toggle a volume mount which contains adapter code. When this is set to false it is assumed that
 # all adapters will be layered into the Itential provided container.
 mountAdapterVolume: false
@@ -29,7 +33,7 @@ external-dns:
 # The image name will depend on the entitlement that has been granted.
 image:
   # -- The image repository
-  repository: 497639811223.dkr.ecr.us-east-2.amazonaws.com/itential-platform
+  repository: 497639811223.dkr.ecr.us-east-2.amazonaws.com/itential-platform-ecm-gm
   # -- The image pull policy
   pullPolicy: IfNotPresent
   # -- The image tag
@@ -146,13 +150,15 @@ ingress:
     alb.ingress.kubernetes.io/healthcheck-interval-seconds: "15"
     alb.ingress.kubernetes.io/healthcheck-timeout-seconds: "5"
     alb.ingress.kubernetes.io/healthy-threshold-count: "2"
-    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS": 443}]'
+    # Include port 8080 if using Gateway Manager with IAG5, otherwise remove it
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS": 443},{"HTTPS": 8080}]'
     alb.ingress.kubernetes.io/load-balancer-attributes: idle_timeout.timeout_seconds=60
     alb.ingress.kubernetes.io/load-balancer-name: "itential-iap-lb"
     alb.ingress.kubernetes.io/scheme: "internet-facing"
     alb.ingress.kubernetes.io/success-codes: "200"
     alb.ingress.kubernetes.io/target-type: "ip"
     alb.ingress.kubernetes.io/unhealthy-threshold-count: "2"
+    alb.ingress.kubernetes.io/websocket-paths: "/ws"
   # TLS is terminated at the statefulset pod by design.
   tls: []
 

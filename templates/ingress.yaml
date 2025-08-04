@@ -44,6 +44,15 @@ spec:
               number: {{ .Values.service.port }}
         path: {{ .Values.ingress.loadBalancer.path | default "/" }}
         pathType: {{ .Values.ingress.pathType | default "Prefix" }}
+      {{- if .Values.useWebSockets }}
+      - backend:
+          service:
+            name: {{ include "iap.fullname" . }}-service
+            port:
+              number: {{ .Values.websocketPort }}
+        path: "/ws"
+        pathType: "Prefix"
+      {{- end }}
   {{- end }}
   # Direct access
   {{- if .Values.ingress.directAccess.enabled }}
