@@ -143,6 +143,7 @@ ingress:
   # -- The annotations for this ingress object. These are passed into the template as is and will
   # render as you see here. Itential leveraged AWS ALB but others should work.
   annotations:
+    kubernetes.io/ingress.class: alb 
     alb.ingress.kubernetes.io/backend-protocol: "HTTPS"
     alb.ingress.kubernetes.io/healthcheck-path: "/health/status"
     alb.ingress.kubernetes.io/healthcheck-port: "3443"
@@ -159,6 +160,7 @@ ingress:
     alb.ingress.kubernetes.io/target-type: "ip"
     alb.ingress.kubernetes.io/unhealthy-threshold-count: "2"
     alb.ingress.kubernetes.io/websocket-paths: "/ws"
+    alb.ingress.kubernetes.io/target-group-attributes: stickiness.enabled=true,stickiness.lb_cookie.duration_seconds=86400
   # TLS is terminated at the statefulset pod by design.
   tls: []
 
