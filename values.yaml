@@ -57,7 +57,7 @@ issuer:
 # The certificate object to use by cert-manager to generate the TLS certificates.
 certificate:
   # -- Toggle to use the certificate object or not
-  enabled: false
+  enabled: true
   issuerRef:
     # -- The name of the issuer with the CA reference.
     name: iap-ca-issuer
@@ -73,6 +73,15 @@ certificate:
   # complete list of hosts to enable direct access to individual pods. Some UI actions in Itential
   # require direct access to pods.
   domain: example.com
+  # -- The list of static DNS names to pass to the certificate.
+  dnsNames:
+    - iap.example.com
+  # -- Specifies any private key properties
+  privateKey: {} # include all required properties, passed to the template as is
+  # -- Specifies any key store properties
+  keyStores: {} # include all required properties, passed to the template as is
+  # -- Specifies any subject fields required
+  subject: {} # include all required properties, passed to the template as is
 
 # Used to configure the storage class object which governs how the mounted volumes are created.
 storageClass:
