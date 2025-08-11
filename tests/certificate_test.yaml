@@ -139,14 +139,28 @@ tests:
     asserts:
       - hasDocuments:
           count: 1
-      - isSubset:
-          path: metadata.labels
-          content:
-            app.kubernetes.io/instance: iap
-            app.kubernetes.io/managed-by: Helm
-            app.kubernetes.io/name: iap
-            app.kubernetes.io/version: 6.0.4
-            helm.sh/chart: iap-1.0.0
+      - equal:
+          path: metadata.labels["app.kubernetes.io/component"]
+          value: "certificate"
+      - equal:
+          path: metadata.labels["app.kubernetes.io/instance"]
+          value: "iap"
+      - equal:
+          path: metadata.labels["app.kubernetes.io/layer"]
+          value: "application"
+      - equal:
+          path: metadata.labels["app.kubernetes.io/managed-by"]
+          value: "Helm"
+      - equal:
+          path: metadata.labels["app.kubernetes.io/name"]
+          value: "iap"
+      - equal:
+          path: metadata.labels["app.kubernetes.io/part-of"]
+          value: "itential-platform"
+      - exists:
+          path: metadata.labels["app.kubernetes.io/version"]
+      - exists:
+          path: metadata.labels["helm.sh/chart"]
 
   - it: should handle string replica count
     set:
