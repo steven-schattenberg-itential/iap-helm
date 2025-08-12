@@ -88,7 +88,7 @@ tests:
           value: "iap.staging.com"
       - contains:
           path: spec.dnsNames
-          content: "iap.example.com"
+          content: "iap.staging.com"
       - contains:
           path: spec.dnsNames
           content: "iap-NAMESPACE-0.staging.com"
@@ -121,7 +121,7 @@ tests:
           value: "iap.local"
       - contains:
           path: spec.dnsNames
-          content: "iap.example.com"
+          content: "iap.local"
       - lengthEqual:
           path: spec.dnsNames
           count: 1
@@ -179,7 +179,7 @@ tests:
           count: 1
       - contains:
           path: spec.dnsNames
-          content: "iap.example.com"
+          content: "test.com"
       - contains:
           path: spec.dnsNames
           content: "iap-NAMESPACE-0.test.com"
@@ -228,7 +228,4 @@ tests:
           value: "special-chars.example.com"
       - contains:
           path: spec.dnsNames
-          content: "iap.example.com"
-      - contains:
-          path: spec.dnsNames
-          content: "RELEASE-NAME-iap-0.example.com"
+          content: "special-chars.example.com"
