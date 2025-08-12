@@ -1,4 +1,4 @@
-values-itential.yaml
+values-*.yaml
 values-*.local.yaml
 secrets/
 *.secret.yaml

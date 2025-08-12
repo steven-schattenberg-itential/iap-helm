@@ -21,10 +21,10 @@ spec:
     kind: {{ .Values.certificate.issuerRef.kind }}
   commonName: {{ .Values.certificate.commonName | quote }}
   dnsNames:
-    - {{ .Values.certificate.commonName | quote }}
+    - {{ .Values.certificate.commonName | quote -}}
     {{/* This will add DNS names for each of the pods for direct access */}}
     {{- range $i := until (.Values.replicaCount | int) }}
-    - {{ include "iap.fullname" $ }}-{{ $i }}.{{ $.Values.certificate.domain }}
+    - {{ printf "%s-%s-%d.%s" (include "iap.name" $) $.Release.Namespace $i $.Values.certificate.domain | quote }}
     {{- end }}
   renewBefore: {{ .Values.certificate.renewBefore }}
   duration: {{ .Values.certificate.duration }}

@@ -1,6 +1,8 @@
 suite: test service template
 templates:
   - service.yaml
+values:
+  - ../tests/test-values.yaml
 tests:
   - it: should render Service with default configuration
     set:

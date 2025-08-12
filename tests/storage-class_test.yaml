@@ -1,6 +1,8 @@
 suite: test storage class template
 templates:
   - storage-class.yaml
+values:
+  - ../tests/test-values.yaml
 tests:
   - it: should not render when storageClass is disabled
     set:
