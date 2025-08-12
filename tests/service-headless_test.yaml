@@ -2,7 +2,7 @@ suite: test individual services
 templates:
   - service-headless.yaml
 values:
-  - ../values.yaml
+  - ../tests/test-values.yaml
 tests:
   - it: should create correct number of services
     set:

@@ -1,6 +1,8 @@
 suite: test storage class template
 templates:
   - storage-class.yaml
+values:
+  - ../tests/test-values.yaml
 tests:
   - it: should not render when storageClass is disabled
     set:
@@ -56,13 +58,28 @@ tests:
         volumeBindingMode: "WaitForFirstConsumer"
         parameters: {}
     asserts:
-      - isSubset:
-          path: metadata.labels
-          content:
-            app.kubernetes.io/instance: RELEASE-NAME
-            app.kubernetes.io/managed-by: Helm
-            app.kubernetes.io/name: iap
-            app.kubernetes.io/version: 6.0.4
+      - equal:
+          path: metadata.labels["app.kubernetes.io/component"]
+          value: "storageclass"
+      - equal:
+          path: metadata.labels["app.kubernetes.io/instance"]
+          value: "RELEASE-NAME"
+      - equal:
+          path: metadata.labels["app.kubernetes.io/layer"]
+          value: "application"
+      - equal:
+          path: metadata.labels["app.kubernetes.io/managed-by"]
+          value: "Helm"
+      - equal:
+          path: metadata.labels["app.kubernetes.io/name"]
+          value: "iap"
+      - equal:
+          path: metadata.labels["app.kubernetes.io/part-of"]
+          value: "itential-platform"
+      - exists:
+          path: metadata.labels["app.kubernetes.io/version"]
+      - exists:
+          path: metadata.labels["helm.sh/chart"]
 
   - it: should handle different provisioners
     set:

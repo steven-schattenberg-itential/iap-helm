@@ -18,13 +18,44 @@ spec:
   issuerRef:
     name: {{ .Values.certificate.issuerRef.name }}
     kind: {{ .Values.certificate.issuerRef.kind }}
-  commonName: {{ .Values.certificate.commonName | quote }}
-  dnsNames:
-    - {{ .Values.certificate.commonName | quote }}
-    {{/* This will add DNS names for each of the pods for direct access */}}
-    {{- range $i := until (.Values.replicaCount | int) }}
-    - {{ include "iap.fullname" $ }}-{{ $i }}.{{ $.Values.certificate.domain }}
+    {{- if hasKey (.Values.certificate.issuer) "group" }}
+    group: {{ .Values.certificate.issuer.group }}
     {{- end }}
   renewBefore: {{ .Values.certificate.renewBefore }}
   duration: {{ .Values.certificate.duration }}
-{{- end -}}
+  commonName: {{ .Values.certificate.commonName | quote }}
+  dnsNames:
+    - {{ .Values.certificate.commonName | quote -}}
+    {{/* This will add DNS names for each of the pods for direct access */}}
+    {{- range $i := until (.Values.replicaCount | int) }}
+    - {{ printf "%s-%s-%d.%s" (include "iap.name" $) $.Release.Namespace $i $.Values.certificate.domain | quote }}
+    {{- end }}
+  {{- if or .Values.certificate.ipAddresses .Values.certificate.includeServiceIPs }}
+  ipAddresses:
+  {{- range .Values.certificate.ipAddresses }}
+    - {{ . | quote }}
+  {{- end }}
+  {{- if .Values.certificate.includeServiceIPs }}
+  {{- range .Values.certificate.services }}
+    {{- if .clusterIP }}
+    - {{ .clusterIP | quote }}
+    {{- end }}
+    {{- if .loadBalancerIP }}
+    - {{ .loadBalancerIP | quote }}
+    {{- end }}
+  {{- end }}
+  {{- end }}
+  {{- end }}
+  {{- with .Values.certificate.privateKey }}
+  privateKey:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.certificate.keystores }}
+  keystores:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.certificate.subject }}
+  subject:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}

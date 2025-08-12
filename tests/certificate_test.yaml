@@ -1,6 +1,8 @@
 suite: test certificate template
 templates:
   - certificate.yaml
+values:
+  - ../tests/test-values.yaml
 tests:
   - it: should not render certificate when disabled
     set:
@@ -53,7 +55,7 @@ tests:
           content: "iap.example.com"
       - contains:
           path: spec.dnsNames
-          content: "my-iap-0.example.com"
+          content: "iap-NAMESPACE-0.example.com"
       - lengthEqual:
           path: spec.dnsNames
           count: 2
@@ -89,13 +91,13 @@ tests:
           content: "iap.staging.com"
       - contains:
           path: spec.dnsNames
-          content: "iap-0.staging.com"
+          content: "iap-NAMESPACE-0.staging.com"
       - contains:
           path: spec.dnsNames
-          content: "iap-1.staging.com"
+          content: "iap-NAMESPACE-1.staging.com"
       - contains:
           path: spec.dnsNames
-          content: "iap-2.staging.com"
+          content: "iap-NAMESPACE-2.staging.com"
       - lengthEqual:
           path: spec.dnsNames
           count: 4
@@ -139,13 +141,28 @@ tests:
     asserts:
       - hasDocuments:
           count: 1
-      - isSubset:
-          path: metadata.labels
-          content:
-            app.kubernetes.io/instance: iap
-            app.kubernetes.io/managed-by: Helm
-            app.kubernetes.io/name: iap
-            app.kubernetes.io/version: 6.0.4
+      - equal:
+          path: metadata.labels["app.kubernetes.io/component"]
+          value: "certificate"
+      - equal:
+          path: metadata.labels["app.kubernetes.io/instance"]
+          value: "iap"
+      - equal:
+          path: metadata.labels["app.kubernetes.io/layer"]
+          value: "application"
+      - equal:
+          path: metadata.labels["app.kubernetes.io/managed-by"]
+          value: "Helm"
+      - equal:
+          path: metadata.labels["app.kubernetes.io/name"]
+          value: "iap"
+      - equal:
+          path: metadata.labels["app.kubernetes.io/part-of"]
+          value: "itential-platform"
+      - exists:
+          path: metadata.labels["app.kubernetes.io/version"]
+      - exists:
+          path: metadata.labels["helm.sh/chart"]
 
   - it: should handle string replica count
     set:
@@ -157,7 +174,6 @@ tests:
       certificate.renewBefore: "720h"
       certificate.duration: "2160h"
       replicaCount: "2"
-      fullnameOverride: "string-replica-iap"
     asserts:
       - hasDocuments:
           count: 1
@@ -166,10 +182,10 @@ tests:
           content: "test.com"
       - contains:
           path: spec.dnsNames
-          content: "string-replica-iap-0.test.com"
+          content: "iap-NAMESPACE-0.test.com"
       - contains:
           path: spec.dnsNames
-          content: "string-replica-iap-1.test.com"
+          content: "iap-NAMESPACE-1.test.com"
       - lengthEqual:
           path: spec.dnsNames
           count: 3
@@ -203,7 +219,7 @@ tests:
       certificate.domain: "example.com"
       certificate.renewBefore: "720h"
       certificate.duration: "2160h"
-      replicaCount: 1
+      replicaCount: "1"
     asserts:
       - hasDocuments:
           count: 1
@@ -223,7 +239,7 @@ tests:
       certificate.domain: "example.com"
       certificate.renewBefore: "720h"
       certificate.duration: "2160h"
-      replicaCount: 1
+      replicaCount: "1"
     asserts:
       - hasDocuments:
           count: 1
