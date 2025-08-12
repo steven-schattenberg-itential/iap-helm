@@ -57,7 +57,7 @@ issuer:
 # The certificate object to use by cert-manager to generate the TLS certificates.
 certificate:
   # -- Toggle to use the certificate object or not
-  enabled: false
+  enabled: true
   issuerRef:
     # -- The name of the issuer with the CA reference.
     name: iap-ca-issuer
