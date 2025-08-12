@@ -112,10 +112,12 @@ spec:
           - name: {{ $key }}
             value: {{ $value | quote }}
           {{- end }}
-          - name: ITENTIAL_SERVER_ID
+          - name: POD_NAME
             valueFrom:
               fieldRef:
                 fieldPath: metadata.name
+          - name: ITENTIAL_SERVER_ID
+            value: "$(POD_NAME)-{{ .Release.Namespace }}"
           - name: ITENTIAL_VAULT_READ_ONLY
             value: "true"
         envFrom:

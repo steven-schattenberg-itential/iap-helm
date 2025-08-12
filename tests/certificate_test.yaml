@@ -1,6 +1,8 @@
 suite: test certificate template
 templates:
   - certificate.yaml
+values:
+  - ../tests/test-values.yaml
 tests:
   - it: should not render certificate when disabled
     set:
@@ -53,7 +55,7 @@ tests:
           content: "iap.example.com"
       - contains:
           path: spec.dnsNames
-          content: "my-iap-0.example.com"
+          content: "iap-NAMESPACE-0.example.com"
       - lengthEqual:
           path: spec.dnsNames
           count: 2
@@ -86,16 +88,16 @@ tests:
           value: "iap.staging.com"
       - contains:
           path: spec.dnsNames
-          content: "iap.example.com"
+          content: "iap.staging.com"
       - contains:
           path: spec.dnsNames
-          content: "iap-0.staging.com"
+          content: "iap-NAMESPACE-0.staging.com"
       - contains:
           path: spec.dnsNames
-          content: "iap-1.staging.com"
+          content: "iap-NAMESPACE-1.staging.com"
       - contains:
           path: spec.dnsNames
-          content: "iap-2.staging.com"
+          content: "iap-NAMESPACE-2.staging.com"
       - lengthEqual:
           path: spec.dnsNames
           count: 4
@@ -119,7 +121,7 @@ tests:
           value: "iap.local"
       - contains:
           path: spec.dnsNames
-          content: "iap.example.com"
+          content: "iap.local"
       - lengthEqual:
           path: spec.dnsNames
           count: 1
@@ -172,19 +174,18 @@ tests:
       certificate.renewBefore: "720h"
       certificate.duration: "2160h"
       replicaCount: "2"
-      fullnameOverride: "string-replica-iap"
     asserts:
       - hasDocuments:
           count: 1
       - contains:
           path: spec.dnsNames
-          content: "iap.example.com"
+          content: "test.com"
       - contains:
           path: spec.dnsNames
-          content: "string-replica-iap-0.test.com"
+          content: "iap-NAMESPACE-0.test.com"
       - contains:
           path: spec.dnsNames
-          content: "string-replica-iap-1.test.com"
+          content: "iap-NAMESPACE-1.test.com"
       - lengthEqual:
           path: spec.dnsNames
           count: 3
@@ -227,7 +228,4 @@ tests:
           value: "special-chars.example.com"
       - contains:
           path: spec.dnsNames
-          content: "iap.example.com"
-      - contains:
-          path: spec.dnsNames
-          content: "RELEASE-NAME-iap-0.example.com"
+          content: "special-chars.example.com"

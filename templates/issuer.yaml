@@ -11,7 +11,7 @@ GNU General Public License v3.0+ (see LICENSE or https://www.gnu.org/licenses/gp
 */}}
 ---
 apiVersion: cert-manager.io/v1
-kind: Issuer
+kind: {{ .Values.issuer.kind | default "Issuer" }}
 metadata:
   name: {{ .Values.issuer.name | quote }}
   labels:

@@ -25,14 +25,12 @@ spec:
   renewBefore: {{ .Values.certificate.renewBefore }}
   duration: {{ .Values.certificate.duration }}
   commonName: {{ .Values.certificate.commonName | quote }}
-  {{- with .Values.certificate.dnsNames }}
   dnsNames:
-    {{- toYaml . | nindent 4 -}}
+    - {{ .Values.certificate.commonName | quote -}}
     {{/* This will add DNS names for each of the pods for direct access */}}
-    {{- range $i := until ($.Values.replicaCount | int) }}
-    - {{ include "iap.fullname" $ }}-{{ $i }}.{{ $.Values.certificate.domain }}
+    {{- range $i := until (.Values.replicaCount | int) }}
+    - {{ printf "%s-%s-%d.%s" (include "iap.name" $) $.Release.Namespace $i $.Values.certificate.domain | quote }}
     {{- end }}
-  {{- end }}
   {{- if or .Values.certificate.ipAddresses .Values.certificate.includeServiceIPs }}
   ipAddresses:
   {{- range .Values.certificate.ipAddresses }}

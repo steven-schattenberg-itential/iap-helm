@@ -1,6 +1,8 @@
 suite: test statefulset template
 templates:
   - statefulset.yaml
+values:
+  - ../tests/test-values.yaml
 tests:
   - it: should not render when statefulset is disabled
     set:
@@ -25,8 +27,6 @@ tests:
       securityContext: {}
       persistentVolumeClaims:
         enabled: false
-    chart:
-      name: "iap"
     asserts:
       - hasDocuments:
           count: 1
