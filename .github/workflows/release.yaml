@@ -54,8 +54,7 @@ jobs:
         env:
           CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
         with:
-          charts_dir: charts
-          generate_release_notes: true
+          config: .cr.yaml
 
   # Update the Github pages
   pages:
