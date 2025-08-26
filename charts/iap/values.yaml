@@ -98,7 +98,7 @@ storageClass:
   # -- Toggle the use of storageClass
   enabled: true
   # -- The name of the storageClass
-  name: "iap-ebs-gp3"
+  name: "example-storage-class"
   # -- Specifies which volume plugin provisions the storage
   provisioner: ""
   # -- What happens to PersistentVolumes when released. Itential recommends "retain".
