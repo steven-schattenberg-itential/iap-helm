@@ -12,10 +12,10 @@ The default load balancing solution uses AWS Application Load Balancer through t
 ingress:
   enabled: true
   className: "alb"  
-  hostname: pet-sbx.itential.io
+  hostname: itential.example.com
   annotations:
     alb.ingress.kubernetes.io/backend-protocol: "HTTPS"
-    alb.ingress.kubernetes.io/healthcheck-path: "/health/status"
+    alb.ingress.kubernetes.io/healthcheck-path: "/health/status?exclude-services=true"
     alb.ingress.kubernetes.io/healthcheck-port: "3443"
     alb.ingress.kubernetes.io/healthcheck-protocol: "HTTPS"
     alb.ingress.kubernetes.io/healthcheck-interval-seconds: "15"
@@ -24,7 +24,7 @@ ingress:
     # Include port 8080 if using Gateway Manager with IAG5, otherwise remove it
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS": 443},{"HTTPS": 8080}]'
     alb.ingress.kubernetes.io/load-balancer-attributes: idle_timeout.timeout_seconds=60
-    alb.ingress.kubernetes.io/load-balancer-name: "itential-iap-lb-na"
+    alb.ingress.kubernetes.io/load-balancer-name: "itential-example-lb"
     alb.ingress.kubernetes.io/scheme: "internet-facing"
     alb.ingress.kubernetes.io/success-codes: "200"
     alb.ingress.kubernetes.io/target-type: "ip"
@@ -43,7 +43,7 @@ For environments where ALB is not available or preferred, NGINX Ingress Controll
 ingress:
   enabled: true
   className: "nginx"  
-  hostname: pet-sbx.itential.io
+  hostname: itential.example.com
   annotations:    
     nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
@@ -68,7 +68,7 @@ The load balancer type can be configured in the values file. See the ingress sec
 ingress:
   enabled: true
   className: "alb"  # Change to "nginx" for NGINX ingress
-  hostname: pet-sbx.itential.io
+  hostname: itential.example.com
   annotations:
     nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
