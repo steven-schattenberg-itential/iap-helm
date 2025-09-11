@@ -1,0 +1,27 @@
+{{- if .Values.processExporter.enabled -}}
+# Copyright (c) 2024, Itential, Inc
+# GNU General Public License v3.0+ (see LICENSE or https://www.gnu.org/licenses/gpl-3.0.txt)
+# Source: charts/iap/templates/PodMonitor.yaml
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: iap-process-exporter
+spec:
+  podMetricsEndpoints:
+    - interval: 15s
+      path: /metrics
+      port: process-metrics
+      relabelings:
+        - action: keep
+          regex: ([\d\.]+):9256
+          sourceLabels: [ __address__ ]
+        - action: labeldrop
+          regex: __meta_kubernetes_service_annotation_kubectl_kubernetes_io_last_applied_configuration
+  jobLabel: app.kubernetes.io/name
+  namespaceSelector:
+    matchNames: [ {{ .Values.namespace }} ]
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: iap
+{{- end -}}
