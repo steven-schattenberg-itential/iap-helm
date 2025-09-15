@@ -1,4 +1,4 @@
-{{- if .Values.processExporter.enabled -}}
+{{- if and $.Values.ingress.enabled $.Values.processExporter.enabled -}}
 ---
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor

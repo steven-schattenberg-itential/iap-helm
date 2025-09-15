@@ -21,7 +21,7 @@ spec:
     - name: https
       port: {{ $.Values.service.port }}
       targetPort: {{ $.Values.applicationPort }}
-    {{- if $.Values.processExporter.enabled }}
+    {{- if and $.Values.ingress.enabled $.Values.processExporter.enabled -}}
     - name: process-metrics
       port: 9256
       targetPort: 9256
