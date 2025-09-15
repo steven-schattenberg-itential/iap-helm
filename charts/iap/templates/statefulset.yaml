@@ -143,7 +143,7 @@ spec:
         {{- with .Values.volumeMounts }}
         {{- toYaml . | nindent 10 }}
         {{- end }}
-     {{- if and $.Values.processExporter $.Values.processExporter.enabled -}}
+     {{- if and .Values.processExporter .Values.processExporter.enabled }}
       - name: process-exporter
         args:
           - -config.path=/etc/process-exporter/process-exporter.conf
@@ -173,7 +173,7 @@ spec:
           secret:
             secretName: {{ include "iap.fullname" . }}-tls-secret
         {{- end }}
-        {{- if and $.Values.processExporter $.Values.processExporter.enabled -}}
+        {{- if and .Values.processExporter .Values.processExporter.enabled }}
         - name: process-exporter
           configMap:
             name: iap-process-exporter
