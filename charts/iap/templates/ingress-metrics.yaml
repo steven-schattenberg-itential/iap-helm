@@ -20,12 +20,12 @@ metadata:
     alb.ingress.kubernetes.io/healthy-threshold-count: "2"
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS": 9256}]'
     alb.ingress.kubernetes.io/load-balancer-attributes: idle_timeout.timeout_seconds=60
-    alb.ingress.kubernetes.io/load-balancer-name: "itential-iap-metrics-lb-{{ .Values.namespace }}"
+    alb.ingress.kubernetes.io/load-balancer-name: "itential-iap-metrics-lb-{{ .Release.Namespace }}"
     alb.ingress.kubernetes.io/scheme: "internet-facing"
     alb.ingress.kubernetes.io/success-codes: "200"
     alb.ingress.kubernetes.io/target-type: "ip"
     alb.ingress.kubernetes.io/unhealthy-threshold-count: "2"
-    external-dns.alpha.kubernetes.io/hostname: iap-metrics-{{ .Values.namespace }}.{{ .Values.certificate.domain }}
+    external-dns.alpha.kubernetes.io/hostname: iap-metrics-{{ .Release.Namespace }}.{{ .Values.certificate.domain }}
     external-dns.alpha.kubernetes.io/ttl: "300"
 spec:
   {{- if .Values.ingress.className }}
@@ -33,7 +33,7 @@ spec:
   {{- end }}
   rules:
   {{- range $i := until (.Values.replicaCount | int) }}
-  - host: {{ printf "iap-metrics-%s-%d.%s" $.Values.namespace $i $.Values.certificate.domain | quote }}
+  - host: {{ printf "iap-metrics-%s-%d.%s" $.Release.Namespace $i $.Values.certificate.domain | quote }}
     http:
       paths:
       - backend:

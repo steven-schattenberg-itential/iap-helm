@@ -1,12 +1,15 @@
 {{- if .Values.processExporter.enabled -}}
-# Copyright (c) 2024, Itential, Inc
-# GNU General Public License v3.0+ (see LICENSE or https://www.gnu.org/licenses/gpl-3.0.txt)
-# Source: charts/iap/templates/PodMonitor.yaml
 ---
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
 metadata:
   name: iap-process-exporter
+  labels:
+    {{- include "iap.labels" . | nindent 4 }}
+    app.kubernetes.io/component: "podmonitor"
+  annotations:
+    kubernetes.io/description: "Itential Automation Platform Pod Monitor."
+    {{- include "iap.annotations" . | nindent 4 }}
 spec:
   podMetricsEndpoints:
     - interval: 15s

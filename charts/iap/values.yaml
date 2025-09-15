@@ -258,6 +258,16 @@ tolerations: []
 # -- Additional affinities
 affinity: {}
 
+# Process exporter configuration for monitoring
+processExporter:
+  # -- Enable process exporter sidecar container
+  enabled: false
+  image:
+    # -- Process exporter image repository
+    repository: ncabatoff/process-exporter
+    # -- Process exporter image tag
+    tag: latest
+
 # Configuration properties for Itential Automation Platform.
 # In most cases, the default values are sufficient. If the property is commented that means that
 # the default value is being used. This is a list of all possible values for convenience. The

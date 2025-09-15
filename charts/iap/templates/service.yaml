@@ -25,7 +25,7 @@ spec:
       targetPort: {{ .Values.websocketPort }}
       protocol: TCP
     {{- end }}
-    {{- if and .Values.processExporter .Values.processExporter.enabled }}
+    {{- if .Values.processExporter.enabled }}
     - name: process-metrics
       port: 9256
       targetPort: 9256

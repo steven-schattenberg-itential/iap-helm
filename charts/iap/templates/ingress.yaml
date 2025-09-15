@@ -49,15 +49,6 @@ spec:
         path: "/ws"
         pathType: "Prefix"
       {{- end }}
-      {{- if and .Values.processExporter .Values.processExporter.enabled }}
-      - backend:
-          service:
-            name: {{ include "iap.fullname" . }}-service
-            port:
-              number: 9256
-        path: "/metrics"
-        pathType: "Prefix"
-      {{- end }}
   {{- end }}
   # Direct access
   {{- if .Values.ingress.directAccess.enabled }}
