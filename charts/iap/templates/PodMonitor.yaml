@@ -23,7 +23,7 @@ spec:
           regex: __meta_kubernetes_service_annotation_kubectl_kubernetes_io_last_applied_configuration
   jobLabel: app.kubernetes.io/name
   namespaceSelector:
-    matchNames: [ {{ .Values.namespace }} ]
+    matchNames: [ {{ .Release.namespace }} ]
   selector:
     matchLabels:
       app.kubernetes.io/name: iap

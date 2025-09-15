@@ -7,6 +7,12 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: iap-process-exporter
+  labels:
+    {{- include "iap.labels" . | nindent 4 }}
+    app.kubernetes.io/component: "iap-process-exporter-configMap"
+  annotations:
+    kubernetes.io/description: "Itential Automation Platform Process exporter configMap."
+    {{- include "iap.annotations" . | nindent 4 }}
 data:
   process-exporter.conf: |
     process_names:
