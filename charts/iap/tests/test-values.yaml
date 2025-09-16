@@ -615,3 +615,9 @@ env:
   # END IAP CONFIGURATION PROPERTIES
   #
 
+processExporter:
+  enabled: false
+  image:
+    repository: ncabatoff/process-exporter
+    tag: latest
+

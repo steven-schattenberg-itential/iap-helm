@@ -1,0 +1,30 @@
+{{- if and $.Values.processExporter $.Values.processExporter.enabled -}}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: iap-process-exporter
+  labels:
+    {{- include "iap.labels" . | nindent 4 }}
+    app.kubernetes.io/component: "podmonitor"
+  annotations:
+    kubernetes.io/description: "Itential Automation Platform Pod Monitor."
+    {{- include "iap.annotations" . | nindent 4 }}
+spec:
+  podMetricsEndpoints:
+    - interval: 15s
+      path: /metrics
+      port: process-metrics
+      relabelings:
+        - action: keep
+          regex: ([\d\.]+):9256
+          sourceLabels: [ __address__ ]
+        - action: labeldrop
+          regex: __meta_kubernetes_service_annotation_kubectl_kubernetes_io_last_applied_configuration
+  jobLabel: app.kubernetes.io/name
+  namespaceSelector:
+    matchNames: [ {{ .Release.namespace }} ]
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: iap
+{{- end -}}
