@@ -24,8 +24,8 @@ spec:
       protocol: TCP
     {{- if and $.Values.processExporter $.Values.processExporter.enabled }}
     - name: process-metrics
-      port: 9256
-      targetPort: 9256
+      port: {{ $.Values.processExporter.port | default 9256 }}
+      targetPort: {{ $.Values.processExporter.port | default 9256 }}
       protocol: TCP
     {{- end }}
 {{- end }}
