@@ -8,7 +8,7 @@ metadata:
     {{- include "iap.labels" . | nindent 4 }}
     app.kubernetes.io/component: "ingress"
   annotations:
-    kubernetes.io/description: "Itential Automation Platform Ingress. Contains load balanced access and individual access."
+    kubernetes.io/description: "Itential Automation Platform Ingress. Contains load balanced access, individual access, and metrics."
     {{- include "iap.annotations" . | nindent 4 }}
     {{- with .Values.ingress.annotations }}
     {{- toYaml . | nindent 4 }}
@@ -63,6 +63,15 @@ spec:
               number: {{ $.Values.service.port }}
         path: {{ $.Values.ingress.directAccess.path | default "/" }}
         pathType: {{ $.Values.ingress.pathType | default "Prefix" }}
+      {{- if and $.Values.processExporter $.Values.processExporter.enabled }}
+      - backend:
+          service:
+            name: {{ include "iap.fullname" $ }}-service-headless-{{ $i }}
+            port:
+              name: process-metrics
+        path: "/metrics"
+        pathType: "Prefix"
+      {{- end }}
   {{- end }}
   {{- end }}
 {{- end }}

@@ -267,6 +267,8 @@ processExporter:
     repository: ncabatoff/process-exporter
     # -- Process exporter image tag
     tag: latest
+  # -- Process exporter metrics port
+  port: 9256
 
 # Configuration properties for Itential Automation Platform.
 # In most cases, the default values are sufficient. If the property is commented that means that

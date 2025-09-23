@@ -476,6 +476,7 @@ tests:
       useWebSockets: false
       processExporter:
         enabled: true
+        port: 9256
     asserts:
       - lengthEqual:
           path: spec.ports
@@ -528,6 +529,7 @@ tests:
       applicationPort: 3443
       processExporter:
         enabled: true
+        port: 9256
     asserts:
       - hasDocuments:
           count: 3
@@ -567,6 +569,7 @@ tests:
       applicationPort: 9000
       processExporter:
         enabled: true
+        port: 9256
     asserts:
       - lengthEqual:
           path: spec.ports

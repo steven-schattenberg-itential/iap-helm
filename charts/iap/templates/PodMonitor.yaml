@@ -17,7 +17,7 @@ spec:
       port: process-metrics
       relabelings:
         - action: keep
-          regex: ([\d\.]+):9256
+          regex: ([\d\.]+):{{ $.Values.processExporter.port | default 9256 }}
           sourceLabels: [ __address__ ]
         - action: labeldrop
           regex: __meta_kubernetes_service_annotation_kubectl_kubernetes_io_last_applied_configuration
