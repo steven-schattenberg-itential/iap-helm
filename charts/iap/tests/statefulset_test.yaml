@@ -27,6 +27,8 @@ tests:
       securityContext: {}
       persistentVolumeClaims:
         enabled: false
+      processExporter:
+        enabled: false
     asserts:
       - hasDocuments:
           count: 1
@@ -65,6 +67,8 @@ tests:
       podSecurityContext: {}
       securityContext: {}
       persistentVolumeClaims:
+        enabled: false
+      processExporter:
         enabled: false
     asserts:
       - equal:
@@ -125,6 +129,8 @@ tests:
       securityContext: {}
       persistentVolumeClaims:
         enabled: false
+      processExporter:
+        enabled: false
     asserts:
       - isSubset:
           path: spec.selector.matchLabels
@@ -147,6 +153,8 @@ tests:
       podSecurityContext: {}
       securityContext: {}
       persistentVolumeClaims:
+        enabled: false
+      processExporter:
         enabled: false
       podAnnotations:
         prometheus.io/scrape: "true"
@@ -179,6 +187,8 @@ tests:
       securityContext: {}
       persistentVolumeClaims:
         enabled: false
+      processExporter:
+        enabled: false
       podLabels:
         environment: "production"
         tier: "backend"
@@ -205,6 +215,8 @@ tests:
       podSecurityContext: {}
       securityContext: {}
       persistentVolumeClaims:
+        enabled: false
+      processExporter:
         enabled: false
       imagePullSecrets:
         - name: "docker-registry-secret"
@@ -233,6 +245,8 @@ tests:
       securityContext: {}
       persistentVolumeClaims:
         enabled: false
+      processExporter:
+        enabled: false
       env:
         NODE_ENV: "production"
         API_KEY: "secret-key"
@@ -256,6 +270,8 @@ tests:
       podSecurityContext: {}
       securityContext: {}
       persistentVolumeClaims:
+        enabled: false
+      processExporter:
         enabled: false
       startupProbe:
         enabled: true
@@ -298,6 +314,8 @@ tests:
       securityContext: {}
       persistentVolumeClaims:
         enabled: false
+      processExporter:
+        enabled: false
       livenessProbe:
         enabled: true
         path: "/health/live"
@@ -324,6 +342,8 @@ tests:
       podSecurityContext: {}
       securityContext: {}
       persistentVolumeClaims:
+        enabled: false
+      processExporter:
         enabled: false
       readinessProbe:
         enabled: true
@@ -356,6 +376,8 @@ tests:
       securityContext: {}
       persistentVolumeClaims:
         enabled: false
+      processExporter:
+        enabled: false
       startupProbe:
         enabled: true
         path: "/health"
@@ -384,6 +406,8 @@ tests:
       podSecurityContext: {}
       securityContext: {}
       persistentVolumeClaims:
+        enabled: false
+      processExporter:
         enabled: false
       nameOverride: "test-app"
     asserts:
@@ -415,6 +439,8 @@ tests:
       podSecurityContext: {}
       securityContext: {}
       persistentVolumeClaims:
+        enabled: false
+      processExporter:
         enabled: false
       resources:
         requests:
@@ -459,6 +485,8 @@ tests:
           storage: "5Gi"
       storageClass:
         name: "fast-ssd"
+      processExporter:
+        enabled: false
     asserts:
       - equal:
           path: spec.volumeClaimTemplates[0].metadata.name
@@ -495,6 +523,8 @@ tests:
       securityContext: {}
       persistentVolumeClaims:
         enabled: false
+      processExporter:
+        enabled: false
       nodeSelector:
         disktype: "ssd"
         kubernetes.io/arch: "amd64"
@@ -521,6 +551,8 @@ tests:
       podSecurityContext: {}
       securityContext: {}
       persistentVolumeClaims:
+        enabled: false
+      processExporter:
         enabled: false
       affinity:
         podAntiAffinity:
@@ -551,6 +583,8 @@ tests:
       podSecurityContext: {}
       securityContext: {}
       persistentVolumeClaims:
+        enabled: false
+      processExporter:
         enabled: false
       tolerations:
         - key: "node-role.kubernetes.io/master"
@@ -589,6 +623,8 @@ tests:
       podSecurityContext: {}
       securityContext: {}
       persistentVolumeClaims:
+        enabled: false
+      processExporter:
         enabled: false
       volumes:
         - name: "config-volume"
@@ -631,6 +667,8 @@ tests:
       securityContext: {}
       persistentVolumeClaims:
         enabled: false
+      processExporter:
+        enabled: false
       startupProbe:
         enabled: false
       livenessProbe:
@@ -661,6 +699,8 @@ tests:
       securityContext: {}
       persistentVolumeClaims:
         enabled: false
+      processExporter:
+        enabled: false
       startupProbe:
         enabled: false
       livenessProbe:
@@ -690,6 +730,8 @@ tests:
       podSecurityContext: {}
       securityContext: {}
       persistentVolumeClaims:
+        enabled: false
+      processExporter:
         enabled: false
       startupProbe:
         enabled: false

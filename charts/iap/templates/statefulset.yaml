@@ -150,11 +150,47 @@ spec:
         {{- with .Values.volumeMounts }}
         {{- toYaml . | nindent 10 }}
         {{- end }}
+      {{- if and .Values.processExporter .Values.processExporter.enabled }}
+      - name: process-exporter
+        args:
+          - -config.path=/etc/process-exporter/process-exporter.conf
+          - -children=false
+          - -recheck-with-time-limit=30s
+          - -threads=false
+          - -web.config.file=/etc/process-exporter/web-config.yaml
+        image: "{{ .Values.processExporter.image.repository }}:{{ .Values.processExporter.image.tag }}"
+        imagePullPolicy: Always
+        ports:
+          - containerPort: {{ .Values.processExporter.port | default 9256 }}
+            name: process-metrics
+            protocol: TCP
+        resources:
+          limits:
+            memory: 50Mi
+          requests:
+            cpu: 100m
+            memory: 50Mi
+        volumeMounts:
+          - name: process-exporter
+            mountPath: /etc/process-exporter
+          - name: platform-cert-volume
+            mountPath: /etc/ssl/platform
+            readOnly: true
+      shareProcessNamespace: true
+      {{- end }}
       volumes:
         {{- if .Values.useTLS }}
         - name: platform-cert-volume
           secret:
             secretName: {{ include "iap.fullname" . }}-tls-secret
+        {{- end }}
+        {{- if and .Values.processExporter .Values.processExporter.enabled }}
+        - name: platform-cert-volume
+          secret:
+            secretName: {{ include "iap.fullname" . }}-tls-secret
+        - name: process-exporter
+          configMap:
+            name: iap-process-exporter
         {{- end }}
       {{- with .Values.volumes }}
         {{- toYaml . | nindent 8 }}

@@ -183,6 +183,10 @@ understand.
 | podAnnotations | object | `{}` | Additional pod annotations |
 | podLabels | object | `{}` | Additional pod labels |
 | podSecurityContext | object | `{"fsGroup":1001,"runAsNonRoot":true,"runAsUser":1001}` | Additional pod security context. The pods will mount some persistent volumes. These settings allow for that to happen. |
+| processExporter.enabled | bool | `true` | Toggle to enable the process exporter sidecar container |
+| processExporter.image.repository | string | `"ncabatoff/process-exporter"` | The process exporter image repository |
+| processExporter.image.tag | string | `"latest"` | The process exporter image tag |
+| processExporter.port | int | `9256` | Process exporter metrics port |
 | replicaCount | int | `2` | The number of pods to start |
 | securityContext | object | `{}` | Additional security context |
 | service.name | string | `"iap-service"` | The name of this Kubernetes service object. |
