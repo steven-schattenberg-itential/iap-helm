@@ -68,6 +68,32 @@ ingress:
     alb.ingress.kubernetes.io/target-group-attributes: stickiness.enabled=true,stickiness.lb_cookie.duration_seconds=3600
 ```
 
+**SSL/TLS Certificate Configuration:**
+
+For SSL/TLS termination at the ALB level, specify an AWS Certificate Manager (ACM) certificate using the `certificate-arn` annotation:
+
+```yaml
+annotations:
+  alb.ingress.kubernetes.io/certificate-arn: "arn:aws:acm:region:account-id:certificate/certificate-id"
+```
+
+The `certificate-arn` annotation:
+- Specifies the ARN (Amazon Resource Name) of an ACM certificate
+- Enables SSL/TLS termination at the load balancer
+- Supports multiple certificates by providing comma-separated ARNs
+- The certificate must be in the same AWS region as the ALB
+- Requires the ALB to have HTTPS listeners configured (via `listen-ports`)
+
+**Example with certificate:**
+
+```yaml
+ingress:
+  annotations:
+    alb.ingress.kubernetes.io/certificate-arn: "arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012"
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/ssl-policy: "ELBSecurityPolicy-TLS-1-2-2017-01"
+```
+
 #### NGINX Ingress Controller - Alternative Option
 
 For environments where ALB is not available or preferred, NGINX Ingress Controller can be used as an alternative.
