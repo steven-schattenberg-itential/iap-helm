@@ -301,7 +301,7 @@ readinessProbe:
 # probe has succeeded once, the liveness probe takes over.
 startupProbe:
   enabled: true
-  initialDelaySeconds: 90
+  initialDelaySeconds: 180
   periodSeconds: 30
   timeoutSeconds: 10
   failureThreshold: 3
