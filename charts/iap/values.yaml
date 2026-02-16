@@ -87,7 +87,8 @@ external-dns:
 # The image name will depend on the entitlement that has been granted.
 image:
   # -- The image repository
-  repository: 497639811223.dkr.ecr.us-east-2.amazonaws.com/itential-platform-ecm-gm
+  # -- Contact Itential to get the correct image repository for your entitlement.
+  repository:
   # -- The image pull policy
   pullPolicy: IfNotPresent
   # -- The image tag
