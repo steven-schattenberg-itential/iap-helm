@@ -97,9 +97,6 @@ image:
 # -- The secrets object used to pull the image from the repo
 imagePullSecrets: []
 
-serviceAccount:
-  name:
-
 # The issuer to be used if using cert-manager to generate the TLS certificates
 issuer:
   # -- Toggle to use the issuer object or not
@@ -199,7 +196,7 @@ ingress:
   # -- The name of this Kubernetes ingress object
   name: "iap-ingress"
   # -- The ingress controller class name
-  className: "alb"
+  className: "alb" # Change to blank more comments describing options
   # -- The ingress controller path type
   pathType: Prefix
   # Load balancer configuration
@@ -452,7 +449,7 @@ env:
   # ITENTIAL_MONGO_URL: ""
 
   # -- Instruct the MongoDB driver to use TLS protocols when connecting to the database.
-  ITENTIAL_MONGO_TLS_ENABLED: "false"
+  ITENTIAL_MONGO_TLS_ENABLED: "false" # should be true by deafult
 
   # -- If true, disables the validation checks for TLS certificates on other servers in the cluster
   # and allows the use of invalid or self-signed certificates to connect.
