@@ -193,10 +193,19 @@ service:
 ingress:
   # -- The ingress object can be disabled and will not be created with this set to false
   enabled: true
-  # -- The name of this Kubernetes ingress object
+  # -- The name of this Kubernetes ingress object. 
   name: "iap-ingress"
-  # -- The ingress controller class name
-  className: "alb" # Change to blank more comments describing options
+  # -- The ingress controller class name. Common options:
+  # --   alb                       - AWS Application Load Balancer (AWS Load Balancer Controller)
+  # --   nginx                     - ingress-nginx (self-hosted, most common)
+  # --   traefik                   - Traefik ingress controller
+  # --   gce                       - Google Cloud GKE HTTP(S) Load Balancer
+  # --   azure/application-gateway - Azure Application Gateway Ingress Controller (AGIC)
+  # --   haproxy                   - HAProxy ingress controller
+  # --   istio                     - Istio Gateway (service mesh)
+  # --   kong                      - Kong ingress controller
+  # --   contour                   - Contour (Envoy-based) ingress controller
+  className: ""
   # -- The ingress controller path type
   pathType: Prefix
   # Load balancer configuration
@@ -224,23 +233,6 @@ ingress:
   # -- The annotations for this ingress object. These are passed into the template as is and will
   # render as you see here. Itential leveraged AWS ALB but others should work.
   annotations:
-    alb.ingress.kubernetes.io/backend-protocol: "HTTPS"
-    alb.ingress.kubernetes.io/healthcheck-path: "/health/status"
-    alb.ingress.kubernetes.io/healthcheck-port: "3443"
-    alb.ingress.kubernetes.io/healthcheck-protocol: "HTTPS"
-    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "15"
-    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: "5"
-    alb.ingress.kubernetes.io/healthy-threshold-count: "2"
-    # Include port 8080 if using Gateway Manager with IAG5, otherwise remove it
-    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS": 443},{"HTTPS": 8080}]'
-    alb.ingress.kubernetes.io/load-balancer-attributes: idle_timeout.timeout_seconds=60
-    alb.ingress.kubernetes.io/load-balancer-name: "itential-iap-lb"
-    alb.ingress.kubernetes.io/scheme: "internet-facing"
-    alb.ingress.kubernetes.io/success-codes: "200"
-    alb.ingress.kubernetes.io/target-type: "ip"
-    alb.ingress.kubernetes.io/unhealthy-threshold-count: "2"
-    alb.ingress.kubernetes.io/websocket-paths: "/ws"
-    alb.ingress.kubernetes.io/target-group-attributes: stickiness.enabled=true,stickiness.lb_cookie.duration_seconds=3600
   # TLS is terminated at the statefulset pod by design.
   tls: []
 
@@ -449,7 +441,7 @@ env:
   # ITENTIAL_MONGO_URL: ""
 
   # -- Instruct the MongoDB driver to use TLS protocols when connecting to the database.
-  ITENTIAL_MONGO_TLS_ENABLED: "false" # should be true by deafult
+  ITENTIAL_MONGO_TLS_ENABLED: "true"
 
   # -- If true, disables the validation checks for TLS certificates on other servers in the cluster
   # and allows the use of invalid or self-signed certificates to connect.
