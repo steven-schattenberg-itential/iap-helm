@@ -200,7 +200,6 @@ ingress:
   # -- (if configured) will be used.
   # -- Common options
   # --   alb                       - AWS Application Load Balancer (AWS Load Balancer Controller)
-  # --   nginx                     - ingress-nginx (self-hosted, most common)
   # --   gce                       - Google Cloud GKE HTTP(S) Load Balancer
   # --   azure/application-gateway - Azure Application Gateway Ingress Controller (AGIC)
   # --   haproxy                   - HAProxy ingress controller
