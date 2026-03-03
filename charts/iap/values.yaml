@@ -195,16 +195,15 @@ ingress:
   enabled: true
   # -- The name of this Kubernetes ingress object. 
   name: "iap-ingress"
-  # -- The ingress controller class name. Common options:
+  # -- The ingress controller class name tells Kubernetes which ingress controller should 
+  # -- handle this ingress object. If left empty, the cluster's default IngressClass
+  # -- (if configured) will be used.
+  # -- Common options
   # --   alb                       - AWS Application Load Balancer (AWS Load Balancer Controller)
   # --   nginx                     - ingress-nginx (self-hosted, most common)
-  # --   traefik                   - Traefik ingress controller
   # --   gce                       - Google Cloud GKE HTTP(S) Load Balancer
   # --   azure/application-gateway - Azure Application Gateway Ingress Controller (AGIC)
   # --   haproxy                   - HAProxy ingress controller
-  # --   istio                     - Istio Gateway (service mesh)
-  # --   kong                      - Kong ingress controller
-  # --   contour                   - Contour (Envoy-based) ingress controller
   className: ""
   # -- The ingress controller path type
   pathType: Prefix
