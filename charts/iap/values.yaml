@@ -97,6 +97,12 @@ image:
 # -- The secrets object used to pull the image from the repo
 imagePullSecrets: []
 
+serviceAccount:
+  # -- The name of the service account to assign to the StatefulSet pods.
+  # -- When set, the pod will use this service account for RBAC and IAM role bindings (e.g. IRSA on AWS).
+  # -- When left empty, Kubernetes will use the default service account in the namespace.
+  name: ""
+
 # The issuer to be used if using cert-manager to generate the TLS certificates
 issuer:
   # -- Toggle to use the issuer object or not
