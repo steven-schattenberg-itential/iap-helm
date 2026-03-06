@@ -35,9 +35,9 @@ ingress:
 
 The chart supports multiple ingress controllers. Choose the one that best fits your environment.
 
-#### AWS Application Load Balancer (ALB) - Default Option
+#### AWS Application Load Balancer (ALB)
 
-The default load balancing solution uses AWS Application Load Balancer through the AWS Load Balancer Controller.
+This load balancing solution uses AWS Application Load Balancer through the AWS Load Balancer Controller.
 
 **ALB Configuration Example:**
 
@@ -94,43 +94,245 @@ ingress:
     alb.ingress.kubernetes.io/ssl-policy: "ELBSecurityPolicy-TLS-1-2-2017-01"
 ```
 
-#### NGINX Ingress Controller - Alternative Option
+#### GKE HTTP(S) Load Balancer - GKE Option
 
-For environments where ALB is not available or preferred, NGINX Ingress Controller can be used as an alternative.
+On Google Kubernetes Engine, the native ingress controller provisions a Google Cloud HTTP(S) Load Balancer. Because IAP terminates TLS at the pod (port 443), GKE requires a `BackendConfig` custom resource to configure HTTPS backend health checks and session affinity, and a `cloud.google.com/app-protocols` annotation on the Service to tell the load balancer to use HTTPS when communicating with pods.
 
-**NGINX Configuration Example:**
+> **Note:** The `BackendConfig` and `ManagedCertificate` resources must be created separately — they are not rendered by this chart. Apply them to your cluster before or alongside the Helm release.
+
+**BackendConfig (apply separately):**
+
+```yaml
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: iap-backend-config
+spec:
+  healthCheck:
+    checkIntervalSec: 15
+    timeoutSec: 5
+    healthyThreshold: 2
+    unhealthyThreshold: 2
+    type: HTTPS
+    requestPath: /health/status
+    port: 3443
+  sessionAffinity:
+    affinityType: GENERATED_COOKIE
+    affinityCookieTtlSec: 3600
+  timeoutSec: 60
+  connectionDraining:
+    drainingTimeoutSec: 60
+```
+
+**ManagedCertificate (apply separately):**
+
+```yaml
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: iap-managed-cert
+spec:
+  domains:
+    - iap.example.com
+    - iap-prod-0.example.com
+    - iap-prod-1.example.com
+```
+
+**Helm values configuration:**
+
+```yaml
+service:
+  type: ClusterIP
+  name: iap-service
+  port: 443
+  annotations:
+    # Tell GKE LB to use HTTPS when communicating with pods
+    cloud.google.com/app-protocols: '{"https":"HTTPS"}'
+    # Enable container-native load balancing (pod-level routing, equivalent to ALB target-type: ip)
+    cloud.google.com/neg: '{"ingress": true}'
+    # Reference the BackendConfig for health checks and session affinity
+    cloud.google.com/backend-config: '{"default": "iap-backend-config"}'
+
+ingress:
+  enabled: true
+  className: "gce"
+  loadBalancer:
+    enabled: true
+    host: iap.example.com
+    path: /
+  directAccess:
+    enabled: true
+    baseDomain: example.com
+    path: /
+  annotations:
+    # Reference the ManagedCertificate for SSL
+    networking.gke.io/managed-certificates: "iap-managed-cert"
+    # Use a static external IP (reserve one in GCP Console first)
+    kubernetes.io/ingress.global-static-ip-name: "iap-static-ip"
+    # Force HTTPS
+    kubernetes.io/ingress.allow-http: "false"
+    external-dns.alpha.kubernetes.io/hostname: iap.example.com
+    external-dns.alpha.kubernetes.io/ttl: "300"
+  # TLS block is not used with GKE ManagedCertificates — leave empty
+  tls: []
+```
+
+> **WebSocket support:** GKE HTTP(S) LB supports WebSockets natively. No additional annotation is required. Ensure port 8080 is exposed via a separate Service or NodePort if using IAG5/Gateway Manager.
+
+---
+
+#### Azure Application Gateway Ingress Controller (AGIC) - AKS Option
+
+On Azure Kubernetes Service, the Application Gateway Ingress Controller (AGIC) provisions an Azure Application Gateway. AGIC uses annotation-based configuration similar to NGINX but with `appgw.ingress.kubernetes.io/` prefixed annotations.
+
+Because IAP terminates TLS at the pod (port 443), the `backend-protocol: "https"` annotation is required. SSL certificates are attached to the Application Gateway frontend, not managed through Kubernetes secrets.
+
+**Helm values configuration:**
+
+```yaml
+service:
+  type: ClusterIP
+  name: iap-service
+  port: 443
+
+ingress:
+  enabled: true
+  className: "azure-application-gateway"
+  loadBalancer:
+    enabled: true
+    host: iap.example.com
+    path: /
+  directAccess:
+    enabled: true
+    baseDomain: example.com
+    path: /
+  annotations:
+    # Use HTTPS when communicating with backend pods (TLS terminates at the pod)
+    appgw.ingress.kubernetes.io/backend-protocol: "https"
+    # Force HTTPS redirect on the frontend
+    appgw.ingress.kubernetes.io/ssl-redirect: "true"
+    # Reference an SSL certificate pre-uploaded to Application Gateway
+    appgw.ingress.kubernetes.io/appgw-ssl-certificate: "iap-ssl-cert"
+    # Health probe configuration
+    appgw.ingress.kubernetes.io/health-probe-path: "/health/status"
+    appgw.ingress.kubernetes.io/health-probe-port: "3443"
+    appgw.ingress.kubernetes.io/health-probe-status-codes: "200-399"
+    appgw.ingress.kubernetes.io/health-probe-interval: "15"
+    appgw.ingress.kubernetes.io/health-probe-timeout: "5"
+    appgw.ingress.kubernetes.io/health-probe-unhealthy-threshold: "2"
+    # Session affinity (equivalent to ALB stickiness)
+    appgw.ingress.kubernetes.io/cookie-based-affinity: "Enabled"
+    appgw.ingress.kubernetes.io/cookie-based-affinity-distinct-name: "true"
+    # Request and connection timeouts
+    appgw.ingress.kubernetes.io/request-timeout: "60"
+    appgw.ingress.kubernetes.io/connection-draining: "true"
+    appgw.ingress.kubernetes.io/connection-draining-timeout: "30"
+    external-dns.alpha.kubernetes.io/hostname: iap.example.com
+    external-dns.alpha.kubernetes.io/ttl: "300"
+  # TLS block is not used with AGIC frontend certificates — leave empty
+  tls: []
+```
+
+> **SSL Certificate:** The `appgw-ssl-certificate` annotation references a certificate by name that must already be uploaded to the Application Gateway in Azure. This is separate from Kubernetes secrets or cert-manager. Alternatively, you can integrate with Azure Key Vault via the AGIC add-on.
+
+> **WebSocket support:** Azure Application Gateway supports WebSockets natively. Ensure port 8080 is included in the Application Gateway listener configuration if using IAG5/Gateway Manager.
+
+---
+
+#### Traefik - Bare-Metal / On-Premises Option
+
+Traefik is a cloud-native ingress controller well suited to bare-metal and on-premises Kubernetes clusters. Because IAP terminates TLS at the pod (port 443), Traefik must be configured to re-encrypt the backend connection — it terminates TLS from the client, then reconnects to the IAP pod over HTTPS.
+
+**Step 1 — Install Traefik:**
+
+```bash
+helm repo add traefik https://traefik.github.io/charts
+helm repo update
+helm install traefik traefik/traefik \
+  --namespace traefik \
+  --create-namespace \
+  --set ingressClass.enabled=true \
+  --set ingressClass.isDefaultClass=false \
+  --set "additionalArguments[0]=--serversTransport.insecureSkipVerify=true"
+```
+
+The `--serversTransport.insecureSkipVerify=true` flag tells Traefik to skip TLS certificate verification when connecting to backend pods. This is required because IAP pods use self-signed certificates that do not include pod IP SANs.
+
+> **Note:** In Traefik v3, the `ServersTransport` CRD annotation (`traefik.ingress.kubernetes.io/service.serversTransport`) on standard Kubernetes Ingress objects does not reliably apply per-service backend TLS settings. The global `--serversTransport.insecureSkipVerify=true` flag is the recommended approach for IAP deployments.
+
+**Step 2 — Apply the ServersTransport CRD** (namespace-scoped, required for Traefik to identify the backend transport configuration):
+
+```bash
+kubectl apply -f - <<EOF
+apiVersion: traefik.io/v1alpha1
+kind: ServersTransport
+metadata:
+  name: iap-servers-transport
+  namespace: <your-namespace>
+spec:
+  insecureSkipVerify: true
+EOF
+```
+
+**Step 3 — Helm values configuration:**
 
 ```yaml
 ingress:
   enabled: true
-  className: "nginx"
+  className: "traefik"
   loadBalancer:
     enabled: true
-    host: "iap.example.com"
-  annotations:    
-    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"
-    nginx.ingress.kubernetes.io/use-regex: "true"
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
-    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
-    nginx.ingress.kubernetes.io/proxy-body-size: "0"
-    nginx.ingress.kubernetes.io/affinity: "cookie"
-    nginx.ingress.kubernetes.io/affinity-mode: "persistent"
-    nginx.ingress.kubernetes.io/session-cookie-name: "iap-server"
-    nginx.ingress.kubernetes.io/session-cookie-max-age: "3600"
-    nginx.ingress.kubernetes.io/websocket-services: "iap-service"
+    host: iap.example.com
+    path: /
+  directAccess:
+    enabled: true
+    baseDomain: example.com
+    path: /
+  annotations:
+    # Route incoming traffic through the HTTPS (websecure) entrypoint
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    # Enable TLS on this router
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    # Reference the ServersTransport CRD — format: <namespace>-<name>@kubernetescrd
+    traefik.ingress.kubernetes.io/service.serversTransport: <namespace>-iap-servers-transport@kubernetescrd
+  tls:
+  - hosts:
+    - iap.example.com
+    secretName: iap-tls-secret
 ```
+
+**NodePort and external load balancer:**
+
+In bare-metal environments, Traefik's `LoadBalancer` service will remain in `<pending>` state without a cloud provider or MetalLB. Traffic reaches Traefik via NodePort. When the external load balancer routes to a fixed port (e.g., 443 or a custom port), configure Traefik with a matching fixed NodePort to avoid reconfiguring the LB on each install:
+
+```bash
+helm install traefik traefik/traefik \
+  --namespace traefik \
+  --create-namespace \
+  --set ingressClass.enabled=true \
+  --set ingressClass.isDefaultClass=false \
+  --set "additionalArguments[0]=--serversTransport.insecureSkipVerify=true" \
+  --set "ports.websecure.nodePort=<your-port>"
+```
+
+> **WebSocket support:** Traefik supports WebSockets natively. No additional annotation is required.
+
+---
 
 #### Load Balancer Comparison
 
-| Feature | ALB | NGINX |
-|---------|-----|-------|
-| **Provider** | AWS Native | Third-party |
-| **SSL Termination** | At load balancer | At load balancer or pod |
-| **WebSocket Support** | Native | Requires annotation |
-| **Session Affinity** | Target group level | Cookie-based |
-| **Health Checks** | Advanced AWS health checks | HTTP/HTTPS probes |
+> **Note:** Ingress NGINX is not included below. Kubernetes SIG Network has announced its retirement — best-effort maintenance ended in March 2026, with no further releases or security fixes. Existing deployments will continue to function, but new deployments should use one of the supported options below.
+
+| Feature | ALB | GKE HTTP(S) LB | Azure AGIC | Traefik |
+|---------|-----|----------------|------------|---------|
+| **Provider** | AWS Native | GCP Native | Azure Native | Self-hosted |
+| **Backend HTTPS** | Annotation | Service annotation + BackendConfig | Annotation | Global flag |
+| **SSL Termination** | At load balancer | At load balancer | At load balancer | At ingress (re-encrypt) |
+| **WebSocket Support** | Native | Native | Native | Native |
+| **Session Affinity** | Target group level | BackendConfig (cookie) | Annotation (cookie) | Middleware (sticky sessions) |
+| **Health Checks** | Annotations | BackendConfig CRD | Annotations | Passive (via response codes) |
+| **Pod-Level Routing** | `target-type: ip` | NEG (`cloud.google.com/neg`) | Default | Default |
+| **Best For** | AWS EKS | GKE | AKS | Bare-metal / on-prem |
 
 ## Direct Access
 
