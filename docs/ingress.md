@@ -260,6 +260,17 @@ The `--serversTransport.insecureSkipVerify=true` flag tells Traefik to skip TLS 
 
 > **Note:** In Traefik v3, the `ServersTransport` CRD annotation (`traefik.ingress.kubernetes.io/service.serversTransport`) on standard Kubernetes Ingress objects does not reliably apply per-service backend TLS settings. The global `--serversTransport.insecureSkipVerify=true` flag is the recommended approach for IAP deployments.
 
+**TLS certificate considerations:**
+
+`insecureSkipVerify` only affects the **backend connection** (Traefik → IAP pod). It has no effect on the **frontend connection** (client browser → Traefik), which uses the certificate from `iap-tls-secret`. Clients only ever see the frontend certificate.
+
+| Connection | Certificate | Verified by |
+|---|---|---|
+| Client → Traefik | `iap-tls-secret` (customer-provided or CA-signed) | Client browser |
+| Traefik → IAP pod | Self-signed (pod-level) | Skipped via `insecureSkipVerify` |
+
+This is a common and accepted pattern. If a customer provides a CA-signed certificate that includes pod DNS names as SANs, `insecureSkipVerify` can be removed. However, pod IPs and their derived DNS names (e.g., `10-200-2-131.na.pod.cluster.local`) are ephemeral — they change on every pod restart — making it impractical to maintain a static certificate for them. The recommended approach is to keep `insecureSkipVerify=true` for the backend and ensure the frontend certificate presented to clients is properly signed.
+
 **Step 2 — Apply the ServersTransport CRD** (namespace-scoped, required for Traefik to identify the backend transport configuration):
 
 ```bash
@@ -294,6 +305,7 @@ ingress:
     # Enable TLS on this router
     traefik.ingress.kubernetes.io/router.tls: "true"
     # Reference the ServersTransport CRD — format: <namespace>-<name>@kubernetescrd
+    # If deploying to the default namespace, use: default-iap-servers-transport@kubernetescrd
     traefik.ingress.kubernetes.io/service.serversTransport: <namespace>-iap-servers-transport@kubernetescrd
   tls:
   - hosts:
@@ -301,21 +313,154 @@ ingress:
     secretName: iap-tls-secret
 ```
 
-**NodePort and external load balancer:**
+> **Cloud environments:** On EKS, GKE, or AKS, Traefik's `LoadBalancer` service is automatically assigned an external IP by the cloud provider. No additional configuration is needed.
 
-In bare-metal environments, Traefik's `LoadBalancer` service will remain in `<pending>` state without a cloud provider or MetalLB. Traffic reaches Traefik via NodePort. When the external load balancer routes to a fixed port (e.g., 443 or a custom port), configure Traefik with a matching fixed NodePort to avoid reconfiguring the LB on each install:
-
-```bash
-helm install traefik traefik/traefik \
-  --namespace traefik \
-  --create-namespace \
-  --set ingressClass.enabled=true \
-  --set ingressClass.isDefaultClass=false \
-  --set "additionalArguments[0]=--serversTransport.insecureSkipVerify=true" \
-  --set "ports.websecure.nodePort=<your-port>"
-```
+> **Bare-metal environments:** Without a cloud provider, the `LoadBalancer` service will remain in `<pending>` state. Install [MetalLB](https://metallb.universe.tf/) to assign external IPs, or consult your cluster administrator for how external traffic is routed to the cluster.
 
 > **WebSocket support:** Traefik supports WebSockets natively. No additional annotation is required.
+
+---
+
+#### HAProxy - Bare-Metal / On-Premises Option
+
+The HAProxy Kubernetes Ingress Controller is a high-performance, enterprise-grade ingress controller well suited to bare-metal and on-premises clusters. Because IAP terminates TLS at the pod (port 443), HAProxy must be configured to re-encrypt the backend connection — it terminates TLS from the client, then reconnects to the IAP pod over HTTPS.
+
+Unlike Traefik, HAProxy does not require a global startup flag or a separate CRD prerequisite. Backend TLS behavior is controlled entirely through annotations on the Ingress object.
+
+**Step 1 — Install HAProxy Kubernetes Ingress Controller:**
+
+```bash
+helm repo add haproxytech https://haproxytech.github.io/helm-charts
+helm repo update
+helm install haproxy-ingress haproxytech/kubernetes-ingress \
+  --namespace haproxy-controller \
+  --create-namespace \
+  --set controller.ingressClass=haproxy \
+  --set controller.ingressClassResource.enabled=true \
+  --set controller.ingressClassResource.name=haproxy \
+  --set controller.ingressClassResource.isDefaultClass=false
+```
+
+**TLS certificate considerations:**
+
+`haproxy.org/server-ssl-verify: "none"` only affects the **backend connection** (HAProxy → IAP pod). It has no effect on the **frontend connection** (client browser → HAProxy), which uses the certificate from `iap-tls-secret`. Clients only ever see the frontend certificate.
+
+| Connection | Certificate | Verified by |
+|---|---|---|
+| Client → HAProxy | `iap-tls-secret` (customer-provided or CA-signed) | Client browser |
+| HAProxy → IAP pod | Self-signed (pod-level) | Skipped via `server-ssl-verify: none` |
+
+This is a common and accepted pattern. Pod IPs and their derived DNS names are ephemeral — they change on every pod restart — making it impractical to maintain a static certificate for backend pods. The recommended approach is to skip verification for the backend and ensure the frontend certificate presented to clients is properly signed.
+
+**Step 2 — Helm values configuration:**
+
+```yaml
+ingress:
+  enabled: true
+  className: "haproxy"
+  loadBalancer:
+    enabled: true
+    host: iap.example.com
+    path: /
+  directAccess:
+    enabled: true
+    baseDomain: example.com
+    path: /
+  annotations:
+    # Re-encrypt to backend IAP pods over HTTPS (IAP terminates TLS at the pod)
+    haproxy.org/server-ssl: "true"
+    # Skip backend certificate verification — IAP pods use self-signed certs without pod IP SANs
+    haproxy.org/server-ssl-verify: "none"
+    # Redirect HTTP to HTTPS
+    haproxy.org/ssl-redirect: "true"
+    # Cookie-based session affinity — required for IAP UI actions that must reach the same pod
+    haproxy.org/cookie-persistence: "iap-server"
+    # Connection and request timeouts
+    haproxy.org/timeout-connect: "5s"
+    haproxy.org/timeout-client: "300s"
+    haproxy.org/timeout-server: "300s"
+    # WebSocket tunnel timeout — keep alive for long-lived WebSocket connections
+    haproxy.org/timeout-tunnel: "3600s"
+    # Health check path for backend IAP pods
+    haproxy.org/check: "true"
+    haproxy.org/check-http: "/health/status?exclude-services=true"
+  tls:
+  - hosts:
+    - iap.example.com
+    secretName: iap-tls-secret
+```
+
+> **Cloud environments:** On EKS, GKE, or AKS, HAProxy's `LoadBalancer` service is automatically assigned an external IP by the cloud provider. No additional configuration is needed.
+
+> **Bare-metal environments:** Without a cloud provider, the `LoadBalancer` service will remain in `<pending>` state. Install [MetalLB](https://metallb.universe.tf/) to assign external IPs, or consult your cluster administrator for how external traffic is routed to the cluster.
+
+---
+
+### Backend SSL Behavior by Controller
+
+IAP pods terminate TLS internally at port 3443 (self-signed certificates). Every ingress controller must re-encrypt the backend connection — it terminates TLS from the client and then reconnects to the IAP pod over HTTPS. How each controller handles this, and how granular that configuration is, differs significantly.
+
+| Controller | How Backend SSL is Configured | Granularity |
+|---|---|---|
+| **ALB** | `alb.ingress.kubernetes.io/backend-protocol: HTTPS` annotation | Per-Ingress |
+| **GKE** | `cloud.google.com/app-protocols` on the Service | Per-Service port |
+| **Azure AGIC** | `appgw.ingress.kubernetes.io/backend-protocol: https` annotation | Per-Ingress |
+| **Traefik** | Global `--serversTransport.insecureSkipVerify=true` startup flag | Global (all backends) |
+| **HAProxy** | `haproxy.org/server-ssl: "true"` annotation | Per-Ingress object (applies to all backends in the Ingress) |
+
+**Why this matters for WebSocket (IAG5/Gateway Manager):**
+
+When `useWebSockets: true` is set, the IAP chart renders a single Ingress with two backends:
+
+- `/` → `iap-service:443` — speaks HTTPS, needs `server-ssl: true`
+- `/ws` → `iap-service:8080` — speaks plain WebSocket (HTTP), must NOT use SSL
+
+**Traefik** avoids this conflict because backend SSL is a global setting applied at the controller level — it re-encrypts port 443 but routes port 8080 as plain HTTP based on the path, without SSL. No per-path configuration is needed.
+
+**HAProxy** applies `haproxy.org/server-ssl: "true"` to every backend in the Ingress object — there is no per-path SSL override. With both `/` and `/ws` in the same Ingress, HAProxy attempts an SSL handshake to port 8080, which fails with `SSL handshake failure (Connection refused)` and marks the WebSocket backend as DOWN.
+
+**Fix: Separate Ingress for the WebSocket path**
+
+Create a second Ingress for `/ws` without `server-ssl: true`. HAProxy will route `/ws` to port 8080 as plain HTTP while the main Ingress continues to use SSL for port 443.
+
+**NA environment example** (`iap-na-k8s.pe.itential.io`):
+
+Apply this manually alongside the Helm-rendered Ingress:
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: iap-ingress-ws
+  namespace: na
+  annotations:
+    kubernetes.io/description: "IAP WebSocket ingress for Gateway Manager (IAG5). Plain HTTP — no server-ssl."
+    haproxy.org/server-ssl: "false"
+    haproxy.org/timeout-connect: "5s"
+    haproxy.org/timeout-client: "300s"
+    haproxy.org/timeout-server: "300s"
+    haproxy.org/timeout-tunnel: "3600s"
+    haproxy.org/cookie-persistence: "iap-server"
+spec:
+  ingressClassName: haproxy
+  tls:
+  - hosts:
+    - iap-na-k8s.pe.itential.io
+    secretName: iap-tls-secret
+  rules:
+  - host: iap-na-k8s.pe.itential.io
+    http:
+      paths:
+      - backend:
+          service:
+            name: iap-service
+            port:
+              number: 8080
+        path: /ws
+        pathType: Prefix
+```
+
+> **Note:** Do not add `haproxy.org/check` or `haproxy.org/check-http` to the WebSocket Ingress. Health checks over port 8080 use a different protocol than the IAP health endpoint (port 3443). HAProxy will verify backend availability through the WebSocket connection itself.
 
 ---
 
@@ -323,16 +468,19 @@ helm install traefik traefik/traefik \
 
 > **Note:** Ingress NGINX is not included below. Kubernetes SIG Network has announced its retirement — best-effort maintenance ended in March 2026, with no further releases or security fixes. Existing deployments will continue to function, but new deployments should use one of the supported options below.
 
-| Feature | ALB | GKE HTTP(S) LB | Azure AGIC | Traefik |
-|---------|-----|----------------|------------|---------|
-| **Provider** | AWS Native | GCP Native | Azure Native | Self-hosted |
-| **Backend HTTPS** | Annotation | Service annotation + BackendConfig | Annotation | Global flag |
-| **SSL Termination** | At load balancer | At load balancer | At load balancer | At ingress (re-encrypt) |
-| **WebSocket Support** | Native | Native | Native | Native |
-| **Session Affinity** | Target group level | BackendConfig (cookie) | Annotation (cookie) | Middleware (sticky sessions) |
-| **Health Checks** | Annotations | BackendConfig CRD | Annotations | Passive (via response codes) |
-| **Pod-Level Routing** | `target-type: ip` | NEG (`cloud.google.com/neg`) | Default | Default |
-| **Best For** | AWS EKS | GKE | AKS | Bare-metal / on-prem |
+| Feature | ALB | GKE HTTP(S) LB | Azure AGIC | Traefik | HAProxy |
+|---------|-----|----------------|------------|---------|---------|
+| **Provider** | AWS Native | GCP Native | Azure Native | Self-hosted | Self-hosted |
+| **Backend HTTPS** | Annotation | Service annotation + BackendConfig | Annotation | Global flag | Annotation |
+| **Backend SSL Granularity** | Per-Ingress | Per-Service port | Per-Ingress | Global (all backends) | Per-Ingress object |
+| **SSL Termination** | At load balancer | At load balancer | At load balancer | At ingress (re-encrypt) | At ingress (re-encrypt) |
+| **WebSocket + SSL mix** | Supported natively | Supported natively | Supported natively | Supported natively | Requires separate Ingress for `/ws` |
+| **WebSocket Support** | Native | Native | Native | Native | Native (tunnel timeout annotation) |
+| **Session Affinity** | Target group level | BackendConfig (cookie) | Annotation (cookie) | Middleware (sticky sessions) | Annotation (cookie) |
+| **Health Checks** | Annotations | BackendConfig CRD | Annotations | Passive (via response codes) | Annotations |
+| **Pod-Level Routing** | `target-type: ip` | NEG (`cloud.google.com/neg`) | Default | Default | Default |
+| **Prerequisite CRD** | None | BackendConfig (out-of-band) | None | ServersTransport CRD | None |
+| **Best For** | AWS EKS | GKE | AKS | Bare-metal / on-prem | Bare-metal / on-prem |
 
 ## Direct Access
 
