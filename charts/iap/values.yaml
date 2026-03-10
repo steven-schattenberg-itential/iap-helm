@@ -87,7 +87,8 @@ external-dns:
 # The image name will depend on the entitlement that has been granted.
 image:
   # -- The image repository
-  repository: 497639811223.dkr.ecr.us-east-2.amazonaws.com/itential-platform-ecm-gm
+  # -- Contact Itential to get the correct image repository for your entitlement.
+  repository:
   # -- The image pull policy
   pullPolicy: IfNotPresent
   # -- The image tag
@@ -97,7 +98,10 @@ image:
 imagePullSecrets: []
 
 serviceAccount:
-  name:
+  # -- The name of the service account to assign to the StatefulSet pods.
+  # -- When set, the pod will use this service account for RBAC and IAM role bindings (e.g. IRSA on AWS).
+  # -- When left empty, Kubernetes will use the default service account in the namespace.
+  name: ""
 
 # The issuer to be used if using cert-manager to generate the TLS certificates
 issuer:
@@ -195,10 +199,17 @@ service:
 ingress:
   # -- The ingress object can be disabled and will not be created with this set to false
   enabled: true
-  # -- The name of this Kubernetes ingress object
+  # -- The name of this Kubernetes ingress object. 
   name: "iap-ingress"
-  # -- The ingress controller class name
-  className: "alb"
+  # -- The ingress controller class name tells Kubernetes which ingress controller should 
+  # -- handle this ingress object. If left empty, the cluster's default IngressClass
+  # -- (if configured) will be used.
+  # -- Common options
+  # --   alb                       - AWS Application Load Balancer (AWS Load Balancer Controller)
+  # --   gce                       - Google Cloud GKE HTTP(S) Load Balancer
+  # --   azure/application-gateway - Azure Application Gateway Ingress Controller (AGIC)
+  # --   haproxy                   - HAProxy ingress controller
+  className: ""
   # -- The ingress controller path type
   pathType: Prefix
   # Load balancer configuration
@@ -226,23 +237,6 @@ ingress:
   # -- The annotations for this ingress object. These are passed into the template as is and will
   # render as you see here. Itential leveraged AWS ALB but others should work.
   annotations:
-    alb.ingress.kubernetes.io/backend-protocol: "HTTPS"
-    alb.ingress.kubernetes.io/healthcheck-path: "/health/status"
-    alb.ingress.kubernetes.io/healthcheck-port: "3443"
-    alb.ingress.kubernetes.io/healthcheck-protocol: "HTTPS"
-    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "15"
-    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: "5"
-    alb.ingress.kubernetes.io/healthy-threshold-count: "2"
-    # Include port 8080 if using Gateway Manager with IAG5, otherwise remove it
-    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS": 443},{"HTTPS": 8080}]'
-    alb.ingress.kubernetes.io/load-balancer-attributes: idle_timeout.timeout_seconds=60
-    alb.ingress.kubernetes.io/load-balancer-name: "itential-iap-lb"
-    alb.ingress.kubernetes.io/scheme: "internet-facing"
-    alb.ingress.kubernetes.io/success-codes: "200"
-    alb.ingress.kubernetes.io/target-type: "ip"
-    alb.ingress.kubernetes.io/unhealthy-threshold-count: "2"
-    alb.ingress.kubernetes.io/websocket-paths: "/ws"
-    alb.ingress.kubernetes.io/target-group-attributes: stickiness.enabled=true,stickiness.lb_cookie.duration_seconds=3600
   # TLS is terminated at the statefulset pod by design.
   tls: []
 
@@ -451,7 +445,7 @@ env:
   # ITENTIAL_MONGO_URL: ""
 
   # -- Instruct the MongoDB driver to use TLS protocols when connecting to the database.
-  ITENTIAL_MONGO_TLS_ENABLED: "false"
+  ITENTIAL_MONGO_TLS_ENABLED: "true"
 
   # -- If true, disables the validation checks for TLS certificates on other servers in the cluster
   # and allows the use of invalid or self-signed certificates to connect.

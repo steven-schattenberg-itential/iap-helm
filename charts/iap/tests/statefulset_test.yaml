@@ -1034,6 +1034,55 @@ tests:
           path: spec.template.spec.initContainers[0].args[1]
           pattern: '.*BRANCHES=\(\s+\).*'
 
+  # Service Account Tests
+  - it: should default serviceAccountName to empty string
+    set:
+      statefulset.enabled: true
+      replicaCount: 1
+      image:
+        repository: "test/app"
+        tag: "v1.0.0"
+        pullPolicy: "IfNotPresent"
+      service:
+        port: 80
+      applicationPort: 8080
+      useTLS: false
+      podSecurityContext: {}
+      securityContext: {}
+      persistentVolumeClaims:
+        enabled: false
+      processExporter:
+        enabled: false
+    asserts:
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: ""
+
+  - it: should set serviceAccountName when serviceAccount.name is provided
+    set:
+      statefulset.enabled: true
+      replicaCount: 1
+      image:
+        repository: "test/app"
+        tag: "v1.0.0"
+        pullPolicy: "IfNotPresent"
+      service:
+        port: 80
+      applicationPort: 8080
+      useTLS: false
+      podSecurityContext: {}
+      securityContext: {}
+      persistentVolumeClaims:
+        enabled: false
+      processExporter:
+        enabled: false
+      serviceAccount:
+        name: "my-service-account"
+    asserts:
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: "my-service-account"
+
   # Additional TLS Secrets Integration Tests
   - it: should handle additionalTLSSecrets in StatefulSet
     set:

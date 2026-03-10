@@ -53,17 +53,6 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
-Create the name of the service account to use
-*/}}
-{{- define "iap.serviceAccountName" -}}
-{{- if .Values.serviceAccount.create }}
-{{- default (include "iap.fullname" .) .Values.serviceAccount.name }}
-{{- else }}
-{{- default "default" .Values.serviceAccount.name }}
-{{- end }}
-{{- end }}
-
-{{/*
 Common annotations.
 */}}
 {{- define "iap.annotations" -}}
