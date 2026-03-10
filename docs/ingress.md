@@ -412,18 +412,12 @@ Contour's key advantage over HAProxy for IAP is how it scopes backend TLS: the `
 kubectl apply -f https://projectcontour.io/quickstart/contour.yaml
 ```
 
-If your cluster does not have a cloud load balancer, patch the Envoy service to NodePort:
-
-```bash
-kubectl patch svc envoy -n projectcontour -p '{"spec":{"type":"NodePort"}}'
-```
-
-To retrieve the assigned HTTPS NodePort:
-
-```bash
-kubectl get svc envoy -n projectcontour \
-  -o jsonpath='{.spec.ports[?(@.name=="https")].nodePort}'
-```
+> **Bare-metal environments:** Without a cloud provider, the Envoy service will remain in `<pending>` state. Patch it to NodePort and retrieve the assigned port for wiring to your external load balancer:
+> ```bash
+> kubectl patch svc envoy -n projectcontour -p '{"spec":{"type":"NodePort"}}'
+> kubectl get svc envoy -n projectcontour \
+>   -o jsonpath='{.spec.ports[?(@.name=="https")].nodePort}'
+> ```
 
 **TLS certificate considerations:**
 
