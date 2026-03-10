@@ -396,6 +396,88 @@ ingress:
 
 ---
 
+#### Contour (Envoy) - Bare-Metal / On-Premises Option
+
+Contour is a CNCF-graduated ingress controller that uses Envoy as its data plane. It is well suited to bare-metal and on-premises clusters and works with the standard `networking.k8s.io/v1` Ingress resource — no chart changes required. Because IAP terminates TLS at the pod (port 443), Contour must re-encrypt the backend connection.
+
+Contour's key advantage over HAProxy for IAP is how it scopes backend TLS: the `projectcontour.io/upstream-protocol.tls` annotation is placed on the **Service** and lists only the ports that should use TLS. Port 8080 (WebSocket) is not listed, so Contour routes it as plain HTTP — the WebSocket SSL conflict present in HAProxy does not occur.
+
+> **Session affinity:** Cookie-based sticky sessions are not supported for standard Kubernetes Ingress resources in Contour. Session affinity requires Contour's `HTTPProxy` CRD. For testing, IAP's own session tokens function across pods. Production deployments should evaluate `HTTPProxy` if same-pod routing is required.
+
+**Step 1 — Install Contour:**
+
+```bash
+helm repo add bitnami https://charts.bitnami.com/bitnami
+helm repo update
+helm install contour bitnami/contour \
+  --namespace projectcontour \
+  --create-namespace \
+  --set envoy.service.type=NodePort \
+  --set ingressClass.name=contour \
+  --set ingressClass.create=true \
+  --set ingressClass.default=false
+```
+
+After install, retrieve the Envoy HTTPS NodePort for nginx LB wiring:
+
+```bash
+kubectl get svc -n projectcontour contour-envoy \
+  -o jsonpath='{.spec.ports[?(@.name=="https")].nodePort}'
+```
+
+**TLS certificate considerations:**
+
+The `projectcontour.io/upstream-protocol.tls` annotation on the Service tells Contour's Envoy to use TLS only for the listed ports. For standard Ingress resources, Envoy does not validate backend certificates when no CA is explicitly configured — self-signed pod certificates work without additional configuration.
+
+| Connection | Certificate | Verified by |
+|---|---|---|
+| Client → Contour | `iap-tls-secret` (customer-provided or CA-signed) | Client browser |
+| Contour → IAP pod (port 443) | Self-signed (pod-level) | Not verified (no CA configured) |
+| Contour → IAP pod (port 8080) | None — plain HTTP | N/A |
+
+**Step 2 — Helm values configuration:**
+
+```yaml
+service:
+  type: ClusterIP
+  name: iap-service
+  port: 443
+  annotations:
+    # Tell Contour/Envoy to use TLS only for port 443.
+    # Port 8080 (WebSocket) is intentionally excluded — it uses plain HTTP.
+    projectcontour.io/upstream-protocol.tls: "443"
+
+ingress:
+  enabled: true
+  className: "contour"
+  loadBalancer:
+    enabled: true
+    host: iap.example.com
+    path: /
+  directAccess:
+    enabled: true
+    baseDomain: example.com
+    hostOverride: "iap-{ns}-contour"
+    path: /
+  annotations:
+    # Redirect HTTP to HTTPS
+    ingress.kubernetes.io/force-ssl-redirect: "true"
+    # Response timeout — set high for long-lived WebSocket connections
+    projectcontour.io/response-timeout: "3600s"
+  tls:
+  - hosts:
+    - iap.example.com
+    secretName: iap-tls-secret
+```
+
+> **Cloud environments:** On EKS, GKE, or AKS, Contour's Envoy `LoadBalancer` service is automatically assigned an external IP by the cloud provider. No additional configuration is needed.
+
+> **Bare-metal environments:** Without a cloud provider, the `LoadBalancer` service will remain in `<pending>` state. Install [MetalLB](https://metallb.universe.tf/) to assign external IPs, or consult your cluster administrator for how external traffic is routed to the cluster.
+
+> **WebSocket support:** Contour supports WebSockets natively. No annotation is required. The `projectcontour.io/response-timeout` annotation controls the idle timeout for long-lived connections including WebSocket.
+
+---
+
 ### Backend SSL Behavior by Controller
 
 IAP pods terminate TLS internally at port 3443 (self-signed certificates). Every ingress controller must re-encrypt the backend connection — it terminates TLS from the client and then reconnects to the IAP pod over HTTPS. How each controller handles this, and how granular that configuration is, differs significantly.
@@ -407,6 +489,7 @@ IAP pods terminate TLS internally at port 3443 (self-signed certificates). Every
 | **Azure AGIC** | `appgw.ingress.kubernetes.io/backend-protocol: https` annotation | Per-Ingress |
 | **Traefik** | Global `--serversTransport.insecureSkipVerify=true` startup flag | Global (all backends) |
 | **HAProxy** | `haproxy.org/server-ssl: "true"` annotation | Per-Ingress object (applies to all backends in the Ingress) |
+| **Contour** | `projectcontour.io/upstream-protocol.tls: "<ports>"` on the Service | Per-Service port |
 
 **Why this matters for WebSocket (IAG5/Gateway Manager):**
 
@@ -468,19 +551,19 @@ spec:
 
 > **Note:** Ingress NGINX is not included below. Kubernetes SIG Network has announced its retirement — best-effort maintenance ended in March 2026, with no further releases or security fixes. Existing deployments will continue to function, but new deployments should use one of the supported options below.
 
-| Feature | ALB | GKE HTTP(S) LB | Azure AGIC | Traefik | HAProxy |
-|---------|-----|----------------|------------|---------|---------|
-| **Provider** | AWS Native | GCP Native | Azure Native | Self-hosted | Self-hosted |
-| **Backend HTTPS** | Annotation | Service annotation + BackendConfig | Annotation | Global flag | Annotation |
-| **Backend SSL Granularity** | Per-Ingress | Per-Service port | Per-Ingress | Global (all backends) | Per-Ingress object |
-| **SSL Termination** | At load balancer | At load balancer | At load balancer | At ingress (re-encrypt) | At ingress (re-encrypt) |
-| **WebSocket + SSL mix** | Supported natively | Supported natively | Supported natively | Supported natively | Requires separate Ingress for `/ws` |
-| **WebSocket Support** | Native | Native | Native | Native | Native (tunnel timeout annotation) |
-| **Session Affinity** | Target group level | BackendConfig (cookie) | Annotation (cookie) | Middleware (sticky sessions) | Annotation (cookie) |
-| **Health Checks** | Annotations | BackendConfig CRD | Annotations | Passive (via response codes) | Annotations |
-| **Pod-Level Routing** | `target-type: ip` | NEG (`cloud.google.com/neg`) | Default | Default | Default |
-| **Prerequisite CRD** | None | BackendConfig (out-of-band) | None | ServersTransport CRD | None |
-| **Best For** | AWS EKS | GKE | AKS | Bare-metal / on-prem | Bare-metal / on-prem |
+| Feature | ALB | GKE HTTP(S) LB | Azure AGIC | Traefik | HAProxy | Contour |
+|---------|-----|----------------|------------|---------|---------|---------|
+| **Provider** | AWS Native | GCP Native | Azure Native | Self-hosted | Self-hosted | Self-hosted |
+| **Backend HTTPS** | Annotation | Service annotation + BackendConfig | Annotation | Global flag | Annotation | Service annotation |
+| **Backend SSL Granularity** | Per-Ingress | Per-Service port | Per-Ingress | Global (all backends) | Per-Ingress object | Per-Service port |
+| **SSL Termination** | At load balancer | At load balancer | At load balancer | At ingress (re-encrypt) | At ingress (re-encrypt) | At ingress (re-encrypt) |
+| **WebSocket + SSL mix** | Supported natively | Supported natively | Supported natively | Supported natively | Requires separate Ingress for `/ws` | Supported natively |
+| **WebSocket Support** | Native | Native | Native | Native | Native (tunnel timeout annotation) | Native (response-timeout annotation) |
+| **Session Affinity** | Target group level | BackendConfig (cookie) | Annotation (cookie) | Middleware (sticky sessions) | Annotation (cookie) | HTTPProxy CRD only |
+| **Health Checks** | Annotations | BackendConfig CRD | Annotations | Passive (via response codes) | Annotations | Passive (Envoy) |
+| **Pod-Level Routing** | `target-type: ip` | NEG (`cloud.google.com/neg`) | Default | Default | Default | Default |
+| **Prerequisite CRD** | None | BackendConfig (out-of-band) | None | ServersTransport CRD | None | None |
+| **Best For** | AWS EKS | GKE | AKS | Bare-metal / on-prem | Bare-metal / on-prem | Bare-metal / on-prem |
 
 ## Direct Access
 
