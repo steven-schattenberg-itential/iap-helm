@@ -440,7 +440,9 @@ service:
     # Tell Contour/Envoy to use TLS only for port 443.
     # Port 8080 (WebSocket) is intentionally excluded — it uses plain HTTP.
     projectcontour.io/upstream-protocol.tls: "443"
+```
 
+```yaml
 ingress:
   enabled: true
   className: "contour"
@@ -474,7 +476,7 @@ ingress:
 
 ### Backend SSL Behavior by Controller
 
-IAP pods terminate TLS internally at port 3443 (self-signed certificates). Every ingress controller must re-encrypt the backend connection — it terminates TLS from the client and then reconnects to the IAP pod over HTTPS. How each controller handles this, and how granular that configuration is, differs significantly.
+IAP pods terminate TLS internally at port 3443 (self-signed certificates). Every ingress controller must re-encrypt the backend connection it terminates TLS from the client and then reconnects to the IAP pod over HTTPS. How each controller handles this, and how granular that configuration is, differs significantly.
 
 | Controller | How Backend SSL is Configured | Granularity |
 |---|---|---|
@@ -499,65 +501,20 @@ When `useWebSockets: true` is set, the IAP chart renders a single Ingress with t
 **Fix: Separate Ingress for the WebSocket path**
 
 Create a second Ingress for `/ws` without `server-ssl: true`. HAProxy will route `/ws` to port 8080 as plain HTTP while the main Ingress continues to use SSL for port 443.
-
-**NA environment example** (`iap-na-k8s.pe.itential.io`):
-
-Apply this manually alongside the Helm-rendered Ingress:
-
-```yaml
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: iap-ingress-ws
-  namespace: na
-  annotations:
-    kubernetes.io/description: "IAP WebSocket ingress for Gateway Manager (IAG5). Plain HTTP — no server-ssl."
-    haproxy.org/server-ssl: "false"
-    haproxy.org/timeout-connect: "5s"
-    haproxy.org/timeout-client: "300s"
-    haproxy.org/timeout-server: "300s"
-    haproxy.org/timeout-tunnel: "3600s"
-    haproxy.org/cookie-persistence: "iap-server"
-spec:
-  ingressClassName: haproxy
-  tls:
-  - hosts:
-    - iap-na-k8s.pe.itential.io
-    secretName: iap-tls-secret
-  rules:
-  - host: iap-na-k8s.pe.itential.io
-    http:
-      paths:
-      - backend:
-          service:
-            name: iap-service
-            port:
-              number: 8080
-        path: /ws
-        pathType: Prefix
-```
-
-> **Note:** Do not add `haproxy.org/check` or `haproxy.org/check-http` to the WebSocket Ingress. Health checks over port 8080 use a different protocol than the IAP health endpoint (port 3443). HAProxy will verify backend availability through the WebSocket connection itself.
-
 ---
 
 #### Load Balancer Comparison
 
 > **Note:** Ingress NGINX is not included below. Kubernetes SIG Network has announced its retirement — best-effort maintenance ended in March 2026, with no further releases or security fixes. Existing deployments will continue to function, but new deployments should use one of the supported options below.
 
-| Feature | ALB | GKE HTTP(S) LB | Azure AGIC | Traefik | HAProxy | Contour |
-|---------|-----|----------------|------------|---------|---------|---------|
-| **Provider** | AWS Native | GCP Native | Azure Native | Self-hosted | Self-hosted | Self-hosted |
-| **Backend HTTPS** | Annotation | Service annotation + BackendConfig | Annotation | Global flag | Annotation | Service annotation |
-| **Backend SSL Granularity** | Per-Ingress | Per-Service port | Per-Ingress | Global (all backends) | Per-Ingress object | Per-Service port |
-| **SSL Termination** | At load balancer | At load balancer | At load balancer | At ingress (re-encrypt) | At ingress (re-encrypt) | At ingress (re-encrypt) |
-| **WebSocket + SSL mix** | Supported natively | Supported natively | Supported natively | Supported natively | Requires separate Ingress for `/ws` | Supported natively |
-| **WebSocket Support** | Native | Native | Native | Native | Native (tunnel timeout annotation) | Native (response-timeout annotation) |
-| **Session Affinity** | Target group level | BackendConfig (cookie) | Annotation (cookie) | Middleware (sticky sessions) | Annotation (cookie) | HTTPProxy CRD only |
-| **Health Checks** | Annotations | BackendConfig CRD | Annotations | Passive (via response codes) | Annotations | Passive (Envoy) |
-| **Pod-Level Routing** | `target-type: ip` | NEG (`cloud.google.com/neg`) | Default | Default | Default | Default |
-| **Prerequisite CRD** | None | BackendConfig (out-of-band) | None | ServersTransport CRD | None | None |
-| **Best For** | AWS EKS | GKE | AKS | Bare-metal / on-prem | Bare-metal / on-prem | Bare-metal / on-prem |
+| Controller | Provider | Backend HTTPS | Backend SSL Granularity | SSL Termination | WebSocket + SSL mix | WebSocket Support | Session Affinity | Health Checks | Pod-Level Routing | Prerequisite CRD | Best For |
+|------------|----------|---------------|-------------------------|-----------------|---------------------|-------------------|------------------|---------------|-------------------|------------------|----------|
+| **ALB** | AWS Native | Annotation | Per-Ingress | At load balancer | Supported natively | Native | Target group level | Annotations | `target-type: ip` | None | AWS EKS |
+| **GKE HTTP(S) LB** | GCP Native | Service annotation + BackendConfig | Per-Service port | At load balancer | Supported natively | Native | BackendConfig (cookie) | BackendConfig CRD | NEG (`cloud.google.com/neg`) | BackendConfig (out-of-band) | GKE |
+| **Azure AGIC** | Azure Native | Annotation | Per-Ingress | At load balancer | Supported natively | Native | Annotation (cookie) | Annotations | Default | None | AKS |
+| **Traefik** | Self-hosted | Global flag | Global (all backends) | At ingress (re-encrypt) | Supported natively | Native | Middleware (sticky sessions) | Passive (via response codes) | Default | ServersTransport CRD | Bare-metal / on-prem |
+| **HAProxy** | Self-hosted | Annotation | Per-Ingress object | At ingress (re-encrypt) | Requires separate Ingress for `/ws` | Native (tunnel timeout annotation) | Annotation (cookie) | Annotations | Default | None | Bare-metal / on-prem |
+| **Contour** | Self-hosted | Service annotation | Per-Service port | At ingress (re-encrypt) | Supported natively | Native (response-timeout annotation) | HTTPProxy CRD only | Passive (Envoy) | Default | None | Bare-metal / on-prem |
 
 ## Direct Access
 
