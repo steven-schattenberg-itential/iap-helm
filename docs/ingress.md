@@ -487,7 +487,7 @@ IAP pods terminate TLS internally at port 3443 (self-signed certificates). Every
 | **HAProxy** | `haproxy.org/server-ssl: "true"` annotation | Per-Ingress object (applies to all backends in the Ingress) |
 | **Contour** | `projectcontour.io/upstream-protocol.tls: "<ports>"` on the Service | Per-Service port |
 
-**Why this matters for WebSocket (IAG5/Gateway Manager):**
+#### Why this matters for WebSocket (IAG5/Gateway Manager)
 
 When `useWebSockets: true` is set, the IAP chart renders a single Ingress with two backends:
 
@@ -501,11 +501,12 @@ When `useWebSockets: true` is set, the IAP chart renders a single Ingress with t
 **Fix: Separate Ingress for the WebSocket path**
 
 Create a second Ingress for `/ws` without `server-ssl: true`. HAProxy will route `/ws` to port 8080 as plain HTTP while the main Ingress continues to use SSL for port 443.
+
 ---
 
 #### Load Balancer Comparison
 
-> **Note:** Ingress NGINX is not included below. Kubernetes SIG Network has announced its retirement — best-effort maintenance ended in March 2026, with no further releases or security fixes. Existing deployments will continue to function, but new deployments should use one of the supported options below.
+> **Note:** Ingress NGINX is not included below. Kubernetes SIG Network has announced its retirement — best-effort maintenance has ended as of March 2026, with no further releases or security fixes. Existing deployments will continue to function, but new deployments should use one of the supported options below.
 
 | Controller | Provider | Backend HTTPS | Backend SSL Granularity | SSL Termination | WebSocket + SSL mix | WebSocket Support | Session Affinity | Health Checks | Pod-Level Routing | Prerequisite CRD | Best For |
 |------------|----------|---------------|-------------------------|-----------------|---------------------|-------------------|------------------|---------------|-------------------|------------------|----------|
@@ -543,7 +544,7 @@ ingress:
 
 **Generated Hostnames** (with `replicaCount: 3`, namespace `production`):
 - `iap-production-0.example.com`
-- `iap-production-1.example.com` 
+- `iap-production-1.example.com`
 - `iap-production-2.example.com`
 
 ### Custom Hostname Override
