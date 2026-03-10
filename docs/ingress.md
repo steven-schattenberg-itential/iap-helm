@@ -390,6 +390,8 @@ ingress:
     secretName: iap-tls-secret
 ```
 
+> **WebSocket support (IAG5/Gateway Manager):** When `useWebSockets: true` is set, the IAP chart renders a single Ingress with two backends: `/` → port 443 (HTTPS) and `/ws` → port 8080 (plain WebSocket). HAProxy applies `haproxy.org/server-ssl: "true"` to every backend in the Ingress object — there is no per-path SSL override. This causes HAProxy to attempt an SSL handshake to port 8080, which fails. The fix is a second Ingress for `/ws` with `haproxy.org/server-ssl: "false"`. See the [WebSocket SSL Conflict](#why-this-matters-for-websocket-iag5gateway-manager) section below for the full example.
+
 > **Cloud environments:** On EKS, GKE, or AKS, HAProxy's `LoadBalancer` service is automatically assigned an external IP by the cloud provider. No additional configuration is needed.
 
 > **Bare-metal environments:** Without a cloud provider, the `LoadBalancer` service will remain in `<pending>` state. Install [MetalLB](https://metallb.universe.tf/) to assign external IPs, or consult your cluster administrator for how external traffic is routed to the cluster.
@@ -407,21 +409,19 @@ Contour's key advantage over HAProxy for IAP is how it scopes backend TLS: the `
 **Step 1 — Install Contour:**
 
 ```bash
-helm repo add bitnami https://charts.bitnami.com/bitnami
-helm repo update
-helm install contour bitnami/contour \
-  --namespace projectcontour \
-  --create-namespace \
-  --set envoy.service.type=NodePort \
-  --set ingressClass.name=contour \
-  --set ingressClass.create=true \
-  --set ingressClass.default=false
+kubectl apply -f https://projectcontour.io/quickstart/contour.yaml
 ```
 
-After install, retrieve the Envoy HTTPS NodePort for nginx LB wiring:
+If your cluster does not have a cloud load balancer, patch the Envoy service to NodePort:
 
 ```bash
-kubectl get svc -n projectcontour contour-envoy \
+kubectl patch svc envoy -n projectcontour -p '{"spec":{"type":"NodePort"}}'
+```
+
+To retrieve the assigned HTTPS NodePort:
+
+```bash
+kubectl get svc envoy -n projectcontour \
   -o jsonpath='{.spec.ports[?(@.name=="https")].nodePort}'
 ```
 
