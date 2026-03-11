@@ -390,7 +390,7 @@ ingress:
     secretName: iap-tls-secret
 ```
 
-> **WebSocket support (IAG5/Gateway Manager):** When `useWebSockets: true` is set, the IAP chart renders a single Ingress with two backends: `/` → port 443 (HTTPS) and `/ws` → port 8080 (plain WebSocket). HAProxy applies `haproxy.org/server-ssl: "true"` to every backend in the Ingress object — there is no per-path SSL override. This causes HAProxy to attempt an SSL handshake to port 8080, which fails. The fix is a second Ingress for `/ws` with `haproxy.org/server-ssl: "false"`. See the [WebSocket SSL Conflict](#why-this-matters-for-websocket-iag5gateway-manager) section below for the full example.
+> **WebSocket support (IAG5/Gateway Manager):** When `useWebSockets: true` is set, the IAP chart renders a single Ingress with two backends: `/` → port 443 (HTTPS) and `/ws` → port 8080 (WSS). HAProxy applies `haproxy.org/server-ssl: "true"` to every backend in the Ingress object — this correctly re-encrypts both the main application traffic and the WebSocket traffic to the IAP pod.
 
 > **Cloud environments:** On EKS, GKE, or AKS, HAProxy's `LoadBalancer` service is automatically assigned an external IP by the cloud provider. No additional configuration is needed.
 
@@ -402,7 +402,7 @@ ingress:
 
 Contour is a CNCF-graduated ingress controller that uses Envoy as its data plane. It is well suited to bare-metal and on-premises clusters and works with the standard `networking.k8s.io/v1` Ingress resource — no chart changes required. Because IAP terminates TLS at the pod (port 443), Contour must re-encrypt the backend connection.
 
-Contour's key advantage over HAProxy for IAP is how it scopes backend TLS: the `projectcontour.io/upstream-protocol.tls` annotation is placed on the **Service** and lists only the ports that should use TLS. Port 8080 (WebSocket) is not listed, so Contour routes it as plain HTTP — the WebSocket SSL conflict present in HAProxy does not occur.
+Contour's key advantage over HAProxy for IAP is how it scopes backend TLS: the `projectcontour.io/upstream-protocol.tls` annotation is placed on the **Service** and lists the ports that should use TLS. Both port 443 (HTTPS) and port 8080 (WSS) must be listed to ensure Contour re-encrypts traffic to both backends.
 
 > **Session affinity:** Cookie-based sticky sessions are not supported for standard Kubernetes Ingress resources in Contour. Session affinity requires Contour's `HTTPProxy` CRD. For testing, IAP's own session tokens function across pods. Production deployments should evaluate `HTTPProxy` if same-pod routing is required.
 
@@ -427,7 +427,7 @@ The `projectcontour.io/upstream-protocol.tls` annotation on the Service tells Co
 |---|---|---|
 | Client → Contour | `iap-tls-secret` (customer-provided or CA-signed) | Client browser |
 | Contour → IAP pod (port 443) | Self-signed (pod-level) | Not verified (no CA configured) |
-| Contour → IAP pod (port 8080) | None — plain HTTP | N/A |
+| Contour → IAP pod (port 8080) | Self-signed (pod-level) | Not verified (no CA configured) |
 
 **Step 2 — Helm values configuration:**
 
@@ -437,9 +437,8 @@ service:
   name: iap-service
   port: 443
   annotations:
-    # Tell Contour/Envoy to use TLS only for port 443.
-    # Port 8080 (WebSocket) is intentionally excluded — it uses plain HTTP.
-    projectcontour.io/upstream-protocol.tls: "443"
+    # Tell Contour/Envoy to use TLS for both the main application port and the WebSocket port.
+    projectcontour.io/upstream-protocol.tls: "443,8080"
 ```
 
 ```yaml
@@ -487,20 +486,14 @@ IAP pods terminate TLS internally at port 3443 (self-signed certificates). Every
 | **HAProxy** | `haproxy.org/server-ssl: "true"` annotation | Per-Ingress object (applies to all backends in the Ingress) |
 | **Contour** | `projectcontour.io/upstream-protocol.tls: "<ports>"` on the Service | Per-Service port |
 
-#### Why this matters for WebSocket (IAG5/Gateway Manager)
+#### WebSocket (IAG5/Gateway Manager) Backend SSL
 
 When `useWebSockets: true` is set, the IAP chart renders a single Ingress with two backends:
 
-- `/` → `iap-service:443` — speaks HTTPS, needs `server-ssl: true`
-- `/ws` → `iap-service:8080` — speaks plain WebSocket (HTTP), must NOT use SSL
+- `/` → `iap-service:443` — speaks HTTPS
+- `/ws` → `iap-service:8080` — speaks WSS (WebSocket Secure)
 
-**Traefik** avoids this conflict because backend SSL is a global setting applied at the controller level — it re-encrypts port 443 but routes port 8080 as plain HTTP based on the path, without SSL. No per-path configuration is needed.
-
-**HAProxy** applies `haproxy.org/server-ssl: "true"` to every backend in the Ingress object — there is no per-path SSL override. With both `/` and `/ws` in the same Ingress, HAProxy attempts an SSL handshake to port 8080, which fails with `SSL handshake failure (Connection refused)` and marks the WebSocket backend as DOWN.
-
-**Fix: Separate Ingress for the WebSocket path**
-
-Create a second Ingress for `/ws` without `server-ssl: true`. HAProxy will route `/ws` to port 8080 as plain HTTP while the main Ingress continues to use SSL for port 443.
+Both backends require backend SSL re-encryption. All supported controllers handle this correctly in a single Ingress — no separate Ingress or special per-path configuration is needed.
 
 ---
 
@@ -514,7 +507,7 @@ Create a second Ingress for `/ws` without `server-ssl: true`. HAProxy will route
 | **GKE HTTP(S) LB** | GCP Native | Service annotation + BackendConfig | Per-Service port | At load balancer | Supported natively | Native | BackendConfig (cookie) | BackendConfig CRD | NEG (`cloud.google.com/neg`) | BackendConfig (out-of-band) | GKE |
 | **Azure AGIC** | Azure Native | Annotation | Per-Ingress | At load balancer | Supported natively | Native | Annotation (cookie) | Annotations | Default | None | AKS |
 | **Traefik** | Self-hosted | Global flag | Global (all backends) | At ingress (re-encrypt) | Supported natively | Native | Middleware (sticky sessions) | Passive (via response codes) | Default | ServersTransport CRD | Bare-metal / on-prem |
-| **HAProxy** | Self-hosted | Annotation | Per-Ingress object | At ingress (re-encrypt) | Requires separate Ingress for `/ws` | Native (tunnel timeout annotation) | Annotation (cookie) | Annotations | Default | None | Bare-metal / on-prem |
+| **HAProxy** | Self-hosted | Annotation | Per-Ingress object | At ingress (re-encrypt) | Supported natively | Native (tunnel timeout annotation) | Annotation (cookie) | Annotations | Default | None | Bare-metal / on-prem |
 | **Contour** | Self-hosted | Service annotation | Per-Service port | At ingress (re-encrypt) | Supported natively | Native (response-timeout annotation) | HTTPProxy CRD only | Passive (Envoy) | Default | None | Bare-metal / on-prem |
 
 ## Direct Access
