@@ -251,81 +251,6 @@ ingress:
 
 ---
 
-#### Contour (Envoy) - Bare-Metal / On-Premises Option
-
-Contour is a CNCF-graduated ingress controller that uses Envoy as its data plane. It is well suited to bare-metal and on-premises clusters and works with the standard `networking.k8s.io/v1` Ingress resource — no chart changes required. Because IAP terminates TLS at the pod (port 443), Contour must re-encrypt the backend connection.
-
-Contour's key advantage over HAProxy for IAP is how it scopes backend TLS: the `projectcontour.io/upstream-protocol.tls` annotation is placed on the **Service** and lists the ports that should use TLS. Both port 443 (HTTPS) and port 8080 (WSS) must be listed to ensure Contour re-encrypts traffic to both backends.
-
-> **Session affinity:** Cookie-based sticky sessions are not supported for standard Kubernetes Ingress resources in Contour. Session affinity requires Contour's `HTTPProxy` CRD. For testing, IAP's own session tokens function across pods. Production deployments should evaluate `HTTPProxy` if same-pod routing is required.
-
-**Step 1 — Install Contour:**
-
-```bash
-kubectl apply -f https://projectcontour.io/quickstart/contour.yaml
-```
-
-> **Bare-metal environments:** Without a cloud provider, the Envoy service will remain in `<pending>` state. Patch it to NodePort and retrieve the assigned port for wiring to your external load balancer:
-> ```bash
-> kubectl patch svc envoy -n projectcontour -p '{"spec":{"type":"NodePort"}}'
-> kubectl get svc envoy -n projectcontour \
->   -o jsonpath='{.spec.ports[?(@.name=="https")].nodePort}'
-> ```
-
-**TLS certificate considerations:**
-
-The `projectcontour.io/upstream-protocol.tls` annotation on the Service tells Contour's Envoy to use TLS only for the listed ports. For standard Ingress resources, Envoy does not validate backend certificates when no CA is explicitly configured — self-signed pod certificates work without additional configuration.
-
-| Connection | Certificate | Verified by |
-|---|---|---|
-| Client → Contour | `iap-tls-secret` (customer-provided or CA-signed) | Client browser |
-| Contour → IAP pod (port 443) | Self-signed (pod-level) | Not verified (no CA configured) |
-| Contour → IAP pod (port 8080) | Self-signed (pod-level) | Not verified (no CA configured) |
-
-**Step 2 — Helm values configuration:**
-
-```yaml
-service:
-  type: ClusterIP
-  name: iap-service
-  port: 443
-  annotations:
-    # Tell Contour/Envoy to use TLS for both the main application port and the WebSocket port.
-    projectcontour.io/upstream-protocol.tls: "443,8080"
-```
-
-```yaml
-ingress:
-  enabled: true
-  className: "contour"
-  loadBalancer:
-    enabled: true
-    host: iap.example.com
-    path: /
-  directAccess:
-    enabled: true
-    baseDomain: example.com
-    hostOverride: "iap-{ns}-contour"
-    path: /
-  annotations:
-    # Redirect HTTP to HTTPS
-    ingress.kubernetes.io/force-ssl-redirect: "true"
-    # Response timeout — set high for long-lived WebSocket connections
-    projectcontour.io/response-timeout: "3600s"
-  tls:
-  - hosts:
-    - iap.example.com
-    secretName: iap-tls-secret
-```
-
-> **Cloud environments:** On EKS, GKE, or AKS, Contour's Envoy `LoadBalancer` service is automatically assigned an external IP by the cloud provider. No additional configuration is needed.
-
-> **Bare-metal environments:** Without a cloud provider, the `LoadBalancer` service will remain in `<pending>` state. Install [MetalLB](https://metallb.universe.tf/) to assign external IPs, or consult your cluster administrator for how external traffic is routed to the cluster.
-
-> **WebSocket support:** Contour supports WebSockets natively. No annotation is required. The `projectcontour.io/response-timeout` annotation controls the idle timeout for long-lived connections including WebSocket.
-
----
-
 ### Backend SSL Behavior by Controller
 
 IAP pods terminate TLS internally at port 3443 (self-signed certificates). Every ingress controller must re-encrypt the backend connection it terminates TLS from the client and then reconnects to the IAP pod over HTTPS. How each controller handles this, and how granular that configuration is, differs significantly.
@@ -335,7 +260,6 @@ IAP pods terminate TLS internally at port 3443 (self-signed certificates). Every
 | **ALB** | `alb.ingress.kubernetes.io/backend-protocol: HTTPS` annotation | Per-Ingress |
 | **HAProxy** | `haproxy.org/server-ssl: "true"` annotation | Per-Ingress object (applies to all backends in the Ingress) |
 | **Traefik** | Global `--serversTransport.insecureSkipVerify=true` startup flag | Global (all backends) |
-| **Contour** | `projectcontour.io/upstream-protocol.tls: "<ports>"` on the Service | Per-Service port |
 
 #### WebSocket (IAG5/Gateway Manager) Backend SSL
 
@@ -357,7 +281,6 @@ Both backends require backend SSL re-encryption. All supported controllers handl
 | **ALB** | AWS Native | Annotation | Per-Ingress | At load balancer | Supported natively | Native | Target group level | Annotations | `target-type: ip` | None | AWS EKS |
 | **HAProxy** | Self-hosted | Annotation | Per-Ingress object | At ingress (re-encrypt) | Supported natively | Native (tunnel timeout annotation) | Annotation (cookie) | Annotations | Default | None | Bare-metal / on-prem |
 | **Traefik** | Self-hosted | Global flag | Global (all backends) | At ingress (re-encrypt) | Supported natively | Native | Middleware (sticky sessions) | Passive (via response codes) | Default | ServersTransport CRD | Bare-metal / on-prem |
-| **Contour** | Self-hosted | Service annotation | Per-Service port | At ingress (re-encrypt) | Supported natively | Native (response-timeout annotation) | HTTPProxy CRD only | Passive (Envoy) | Default | None | Bare-metal / on-prem |
 
 ## Direct Access
 
