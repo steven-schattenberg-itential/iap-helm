@@ -28,6 +28,14 @@ The following environment variables are configured to override the defaults:
   {{ $key }}: {{ $value | quote }}
 {{- end }}
 
+{{- if and .Values.certificate.enabled .Values.certificate.dnsNames }}
+⚠ NOTICE: certificate.dnsNames is set and non-empty. The chart will use exactly
+  those entries as certificate SANs — per-replica DNS names will NOT be
+  auto-generated. If you are upgrading from a previous version and had
+  certificate.dnsNames set to the old chart default (e.g. [iap.example.com]),
+  clear it (set to []) to restore auto-generation of per-replica SANs.
+{{- end }}
+
 For more information consult the Itential documentation:
 https://docs.itential.com/docs/about-itential-platform-6-feature-release
 

@@ -125,13 +125,31 @@ certificate:
   duration: 2160h
   # -- The Common Name to use when creating certificates
   commonName: iap.example.com
-  # -- The domain to use when creating certificates. This will be used by the templates to build a
-  # complete list of hosts to enable direct access to individual pods. Some UI actions in Itential
-  # require direct access to pods.
+  # -- The domain used to auto-generate per-replica DNS names in the certificate (e.g. example.com
+  # -- produces iap-prod-0.example.com, iap-prod-1.example.com, ...).
+  # --
+  # -- This should match ingress.directAccess.baseDomain. If they differ, the certificate SANs
+  # -- will not cover the ingress direct-access hostnames and TLS will fail for pod-level access.
+  # -- Only set them to different values if you have a specific reason to issue a certificate that
+  # -- covers a different domain than the one used for ingress routing.
   domain: example.com
-  # -- The list of static DNS names to pass to the certificate.
-  dnsNames:
-    - iap.example.com
+  # -- DNS names to include in the certificate.
+  # --
+  # -- Auto (default) — leave empty and the chart generates the list from commonName and
+  # -- replicaCount. For 3 replicas in namespace 'prod' this produces:
+  # --   - iap.example.com                        (commonName)
+  # --   - iap-prod-0.example.com                 (per-replica direct access)
+  # --   - iap-prod-1.example.com
+  # --   - iap-prod-2.example.com
+  # --
+  # -- Manual — provide the complete list and the auto-generated entries are skipped entirely.
+  # -- Use this when you need SANs that differ from the auto-generated pattern (e.g. CDN aliases,
+  # -- legacy hostnames, or wildcard entries).
+  # --   dnsNames:
+  # --     - iap.example.com
+  # --     - cdn.example.com
+  # --     - "*.example.com"
+  dnsNames: []
   # -- Specifies any private key properties
   privateKey: {} # include all required properties, passed to the template as is
   # -- Specifies any key store properties
@@ -219,6 +237,8 @@ ingress:
     # -- Enable direct access to all Itential pods.
     enabled: true
     # -- The base domain for each Itential pod, used by the templates to create host names.
+    # -- This should match certificate.domain. If they differ, the certificate SANs will not
+    # -- cover these ingress hostnames and TLS will fail for direct pod access.
     baseDomain: example.com
     # -- The path
     path: /
@@ -231,7 +251,36 @@ ingress:
   # -- The annotations for this ingress object. These are passed into the template as is and will
   # render as you see here. Itential leveraged AWS ALB but others should work.
   annotations:
-  # TLS is terminated at the statefulset pod by design.
+  # -- TLS configuration for the ingress. Controls which secret the ingress controller uses for
+  # -- TLS termination and which hostnames are covered by that secret.
+  # --
+  # -- The secretName should reference a Kubernetes TLS secret. This is typically the secret
+  # -- created by the certificate object in this chart (see certificate.secretName).
+  # --
+  # -- Auto (default) — omit hosts and the chart generates the list from loadBalancer.host and
+  # -- directAccess configuration. For 3 replicas this produces:
+  # --   - iap.example.com                        (load balancer)
+  # --   - iap-0.example.com                      (per-replica direct access)
+  # --   - iap-1.example.com
+  # --   - iap-2.example.com
+  # --
+  # -- Manual — provide a hosts list and the auto-generated entries are skipped entirely.
+  # -- Use this when your hostnames differ from the auto-generated pattern (e.g. CDN aliases,
+  # -- legacy hostnames, or when using cert-manager ingress annotations where the hosts list
+  # -- drives the certificate SANs directly).
+  # --
+  # -- Simplified format (single secret):
+  # --   tls:
+  # --     secretName: iap-tls-secret
+  # --     hosts:                          # optional — replaces auto-generated list
+  # --       - iap.example.com
+  # --       - cdn.example.com
+  # --
+  # -- List format (multiple secrets):
+  # --   tls:
+  # --     - secretName: iap-tls-secret
+  # --       hosts:                        # optional — replaces auto-generated list
+  # --         - iap.example.com
   tls: []
 
 statefulset:

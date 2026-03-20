@@ -156,8 +156,6 @@ ingress:
     haproxy.org/check: "true"
     haproxy.org/check-http: "/health/status?exclude-services=true"
   tls:
-  - hosts:
-    - iap.example.com
     secretName: iap-tls-secret
 ```
 
@@ -238,8 +236,6 @@ ingress:
     # If deploying to the default namespace, use: default-iap-servers-transport@kubernetescrd
     traefik.ingress.kubernetes.io/service.serversTransport: <namespace>-iap-servers-transport@kubernetescrd
   tls:
-  - hosts:
-    - iap.example.com
     secretName: iap-tls-secret
 ```
 
@@ -371,18 +367,50 @@ ingress:
 
 ## TLS Configuration
 
-Both access methods support TLS termination. Configure certificates using cert-manager or manually:
+Both access methods support TLS termination. Configure certificates using cert-manager or manually.
+
+The chart automatically generates the full list of TLS hostnames from your `loadBalancer` and `directAccess` configuration — there is no need to list hosts manually. Only the `secretName` is required:
 
 ```yaml
 ingress:
   tls:
+    secretName: iap-tls-secret
+```
+
+Given `replicaCount: 3`, `loadBalancer.host: iap.your-domain.com`, and `directAccess.hostOverride: iap-prod`, the chart will generate the following host list in the ingress TLS spec:
+
+- `iap.your-domain.com` — load balancer hostname
+- `iap-prod-0.your-domain.com` — direct access, pod 0
+- `iap-prod-1.your-domain.com` — direct access, pod 1
+- `iap-prod-2.your-domain.com` — direct access, pod 2
+
+The `secretName` should reference a Kubernetes TLS secret containing the certificate and private key. This is typically the secret created by the `certificate` object in this chart (see `certificate.secretName`).
+
+### Additional Hostnames
+
+If you need to include hostnames beyond what the chart generates (e.g. a CDN endpoint, an admin hostname, or a secondary ingress address), add them under `hosts` in either form. The auto-generated hostnames are always included first, with any extra entries appended after:
+
+```yaml
+# Simplified form
+ingress:
+  tls:
+    secretName: iap-tls-secret
+    hosts:
+      - "admin.your-domain.com"
+      - "cdn.your-domain.com"
+```
+
+```yaml
+# List form — use when multiple secrets are needed
+ingress:
+  tls:
     - secretName: iap-tls-secret
       hosts:
-        - "iap.your-domain.com"
-        - "iap-prod-0.your-domain.com"
-        - "iap-prod-1.your-domain.com"
-        - "iap-prod-2.your-domain.com"
+        - "admin.your-domain.com"
+        - "cdn.your-domain.com"
 ```
+
+> **Note:** Hosts listed here are **appended** to the auto-generated list — they do not replace it. There is no need to repeat the load balancer or direct access hostnames.
 
 ## Process Exporter Integration
 

@@ -119,18 +119,278 @@ tests:
           value: alb
 
 ### TLS Tests
-  - it: should include TLS configuration when provided
+
+  ## Simplified map form
+  - it: should render TLS using simplified map form with auto-generated hosts
+    set:
+      ingress:
+        enabled: true
+        tls:
+          secretName: iap-tls-secret
+        loadBalancer:
+          enabled: true
+          host: iap.example.com
+        directAccess:
+          enabled: true
+          baseDomain: example.com
+      service:
+        port: 443
+      replicaCount: 3
+    asserts:
+      - exists:
+          path: spec.tls
+      - lengthEqual:
+          path: spec.tls
+          count: 1
+      - equal:
+          path: spec.tls[0].secretName
+          value: iap-tls-secret
+      - lengthEqual:
+          path: spec.tls[0].hosts
+          count: 4
+      - contains:
+          path: spec.tls[0].hosts
+          content: iap.example.com
+      - contains:
+          path: spec.tls[0].hosts
+          content: RELEASE-NAME-iap-NAMESPACE-0.example.com
+      - contains:
+          path: spec.tls[0].hosts
+          content: RELEASE-NAME-iap-NAMESPACE-1.example.com
+      - contains:
+          path: spec.tls[0].hosts
+          content: RELEASE-NAME-iap-NAMESPACE-2.example.com
+
+  - it: should render TLS simplified form with only load balancer host
+    set:
+      ingress:
+        enabled: true
+        tls:
+          secretName: iap-tls-secret
+        loadBalancer:
+          enabled: true
+          host: iap.example.com
+        directAccess:
+          enabled: false
+      service:
+        port: 443
+      replicaCount: 3
+    asserts:
+      - lengthEqual:
+          path: spec.tls[0].hosts
+          count: 1
+      - equal:
+          path: spec.tls[0].hosts[0]
+          value: iap.example.com
+
+  - it: should render TLS simplified form with only direct access hosts
+    set:
+      ingress:
+        enabled: true
+        tls:
+          secretName: iap-tls-secret
+        loadBalancer:
+          enabled: false
+        directAccess:
+          enabled: true
+          baseDomain: example.com
+      service:
+        port: 443
+      replicaCount: 2
+    asserts:
+      - lengthEqual:
+          path: spec.tls[0].hosts
+          count: 2
+      - contains:
+          path: spec.tls[0].hosts
+          content: RELEASE-NAME-iap-NAMESPACE-0.example.com
+      - contains:
+          path: spec.tls[0].hosts
+          content: RELEASE-NAME-iap-NAMESPACE-1.example.com
+
+  - it: should use manual hosts overriding auto-generation in simplified form
+    set:
+      ingress:
+        enabled: true
+        tls:
+          secretName: iap-tls-secret
+          hosts:
+            - admin.example.com
+            - cdn.example.com
+        loadBalancer:
+          enabled: true
+          host: iap.example.com
+        directAccess:
+          enabled: true
+          baseDomain: example.com
+      service:
+        port: 443
+      replicaCount: 2
+    asserts:
+      - lengthEqual:
+          path: spec.tls[0].hosts
+          count: 2  # only the manually provided hosts
+      - contains:
+          path: spec.tls[0].hosts
+          content: admin.example.com
+      - contains:
+          path: spec.tls[0].hosts
+          content: cdn.example.com
+      - notContains:
+          path: spec.tls[0].hosts
+          content: iap.example.com
+      - notContains:
+          path: spec.tls[0].hosts
+          content: RELEASE-NAME-iap-NAMESPACE-0.example.com
+
+  - it: should use hostOverride in TLS auto-generated hosts with simplified form
+    set:
+      ingress:
+        enabled: true
+        tls:
+          secretName: iap-tls-secret
+        loadBalancer:
+          enabled: true
+          host: iap.example.com
+        directAccess:
+          enabled: true
+          baseDomain: example.com
+          hostOverride: iap-prod
+      service:
+        port: 443
+      replicaCount: 2
+    asserts:
+      - lengthEqual:
+          path: spec.tls[0].hosts
+          count: 3
+      - contains:
+          path: spec.tls[0].hosts
+          content: iap.example.com
+      - contains:
+          path: spec.tls[0].hosts
+          content: iap-prod-0.example.com
+      - contains:
+          path: spec.tls[0].hosts
+          content: iap-prod-1.example.com
+
+  ## List form
+  - it: should render TLS using list form with no hosts — auto-generated only
+    set:
+      ingress:
+        enabled: true
+        tls:
+          - secretName: iap-tls-secret
+        loadBalancer:
+          enabled: true
+          host: iap.example.com
+        directAccess:
+          enabled: true
+          baseDomain: example.com
+      service:
+        port: 443
+      replicaCount: 3
+    asserts:
+      - exists:
+          path: spec.tls
+      - lengthEqual:
+          path: spec.tls
+          count: 1
+      - equal:
+          path: spec.tls[0].secretName
+          value: iap-tls-secret
+      - lengthEqual:
+          path: spec.tls[0].hosts
+          count: 4
+      - contains:
+          path: spec.tls[0].hosts
+          content: iap.example.com
+      - contains:
+          path: spec.tls[0].hosts
+          content: RELEASE-NAME-iap-NAMESPACE-0.example.com
+      - contains:
+          path: spec.tls[0].hosts
+          content: RELEASE-NAME-iap-NAMESPACE-1.example.com
+      - contains:
+          path: spec.tls[0].hosts
+          content: RELEASE-NAME-iap-NAMESPACE-2.example.com
+
+  - it: should use manual hosts overriding auto-generation in list form
+    set:
+      ingress:
+        enabled: true
+        tls:
+          - secretName: iap-tls-secret
+            hosts:
+              - admin.example.com
+        loadBalancer:
+          enabled: true
+          host: iap.example.com
+        directAccess:
+          enabled: true
+          baseDomain: example.com
+      service:
+        port: 443
+      replicaCount: 2
+    asserts:
+      - lengthEqual:
+          path: spec.tls[0].hosts
+          count: 1  # only the manually provided host
+      - contains:
+          path: spec.tls[0].hosts
+          content: admin.example.com
+      - notContains:
+          path: spec.tls[0].hosts
+          content: iap.example.com
+      - notContains:
+          path: spec.tls[0].hosts
+          content: RELEASE-NAME-iap-NAMESPACE-0.example.com
+
+  - it: should support multiple TLS secrets with list form
+    set:
+      ingress:
+        enabled: true
+        tls:
+          - secretName: primary-tls-secret
+          - secretName: secondary-tls-secret
+        loadBalancer:
+          enabled: true
+          host: iap.example.com
+        directAccess:
+          enabled: true
+          baseDomain: example.com
+      service:
+        port: 443
+      replicaCount: 2
+    asserts:
+      - lengthEqual:
+          path: spec.tls
+          count: 2
+      - equal:
+          path: spec.tls[0].secretName
+          value: primary-tls-secret
+      - equal:
+          path: spec.tls[1].secretName
+          value: secondary-tls-secret
+      - lengthEqual:
+          path: spec.tls[0].hosts
+          count: 3
+      - lengthEqual:
+          path: spec.tls[1].hosts
+          count: 3
+
+  ## List form — manual hosts override auto-generation
+  - it: should use manual hosts overriding auto-generation across multiple secrets
     set:
       ingress:
         enabled: true
         tls:
           - secretName: test-tls-secret
             hosts:
-              - test.example.com
-              - api.example.com
+              - manual-1.example.com
+              - manual-2.example.com
           - secretName: another-tls-secret
             hosts:
-              - another.example.com
+              - manual-3.example.com
         loadBalancer:
           enabled: true
           host: test.example.com
@@ -148,18 +408,30 @@ tests:
       - equal:
           path: spec.tls[0].secretName
           value: test-tls-secret
+      - lengthEqual:
+          path: spec.tls[0].hosts
+          count: 2
       - contains:
+          path: spec.tls[0].hosts
+          content: manual-1.example.com
+      - contains:
+          path: spec.tls[0].hosts
+          content: manual-2.example.com
+      - notContains:
           path: spec.tls[0].hosts
           content: test.example.com
-      - contains:
-          path: spec.tls[0].hosts
-          content: api.example.com
       - equal:
           path: spec.tls[1].secretName
           value: another-tls-secret
+      - lengthEqual:
+          path: spec.tls[1].hosts
+          count: 1
       - contains:
           path: spec.tls[1].hosts
-          content: another.example.com
+          content: manual-3.example.com
+      - notContains:
+          path: spec.tls[1].hosts
+          content: test.example.com
 
   - it: should not include TLS when not provided
     set:
@@ -177,7 +449,7 @@ tests:
       - notExists:
           path: spec.tls
 
-  - it: should handle single TLS configuration
+  - it: should use manual hosts overriding auto-generation for single secret
     set:
       ingress:
         enabled: true
@@ -204,10 +476,13 @@ tests:
           value: single-tls-secret
       - lengthEqual:
           path: spec.tls[0].hosts
-          count: 1
+          count: 1  # only the manually provided host
       - equal:
           path: spec.tls[0].hosts[0]
           value: single.example.com
+      - notContains:
+          path: spec.tls[0].hosts
+          content: test.example.com
 
 ### Load balancer tests
   - it: should create load balancer rule when enabled
@@ -623,11 +898,7 @@ tests:
           alb.ingress.kubernetes.io/scheme: internet-facing
           alb.ingress.kubernetes.io/target-type: ip
         tls:
-          - secretName: example-tls
-            hosts:
-              - lb.example.com
-              - iap-0.example.com
-              - iap-1.example.com
+          secretName: example-tls
         loadBalancer:
           enabled: true
           host: lb.example.com
@@ -647,6 +918,21 @@ tests:
           path: metadata.annotations
       - exists:
           path: spec.tls
+      - equal:
+          path: spec.tls[0].secretName
+          value: example-tls
+      - lengthEqual:
+          path: spec.tls[0].hosts
+          count: 3  # 1 LB host + 2 direct access hosts
+      - contains:
+          path: spec.tls[0].hosts
+          content: lb.example.com
+      - contains:
+          path: spec.tls[0].hosts
+          content: RELEASE-NAME-iap-NAMESPACE-0.example.com
+      - contains:
+          path: spec.tls[0].hosts
+          content: RELEASE-NAME-iap-NAMESPACE-1.example.com
       - lengthEqual:
           path: spec.rules
           count: 3
@@ -787,7 +1073,7 @@ tests:
           path: metadata.annotations["external-dns.alpha.kubernetes.io/hostname"]
           value: test.example.com,api.example.com
 
-  - it: should handle multiple TLS configurations with many hosts
+  - it: should use manual hosts overriding auto-generation across multiple secrets with many hosts
     set:
       ingress:
         enabled: true
@@ -803,7 +1089,7 @@ tests:
               - admin.example.com
         loadBalancer:
           enabled: true
-          host: api.example.com
+          host: lb.example.com
         directAccess:
           enabled: false
       service:
@@ -815,16 +1101,22 @@ tests:
           count: 2
       - lengthEqual:
           path: spec.tls[0].hosts
-          count: 2
+          count: 2  # only the manually provided hosts
       - lengthEqual:
           path: spec.tls[1].hosts
-          count: 3
+          count: 3  # only the manually provided hosts
       - contains:
           path: spec.tls[0].hosts
           content: "*.example.com"
+      - notContains:
+          path: spec.tls[0].hosts
+          content: lb.example.com
       - contains:
           path: spec.tls[1].hosts
           content: admin.example.com
+      - notContains:
+          path: spec.tls[1].hosts
+          content: lb.example.com
 
   - it: should handle different pathTypes for different rules
     set:

@@ -72,3 +72,19 @@ Direct host names
 {{- printf "%s-%s-%d.%s" (include "iap.fullname" .) .Release.Namespace $iterator .Values.ingress.directAccess.baseDomain -}}
 {{- end -}}
 {{- end }}
+
+{{/*
+Generate the full list of TLS hostnames for the ingress spec.
+Includes the load balancer hostname and one entry per replica for direct access.
+Rendered as a YAML list of quoted strings, suitable for use with nindent.
+*/}}
+{{- define "iap.ingressTLSHosts" -}}
+{{- if .Values.ingress.loadBalancer.enabled }}
+- {{ .Values.ingress.loadBalancer.host | quote }}
+{{- end }}
+{{- if .Values.ingress.directAccess.enabled }}
+{{- range $i := until (.Values.replicaCount | int) }}
+- {{ include "iap.DirectAccessHost" (dict "Values" $.Values "Release" $.Release "Chart" $.Chart "Template" $.Template "iterator" $i) | quote }}
+{{- end }}
+{{- end }}
+{{- end }}

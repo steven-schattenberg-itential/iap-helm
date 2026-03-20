@@ -25,10 +25,17 @@ spec:
   duration: {{ .Values.certificate.duration }}
   commonName: {{ .Values.certificate.commonName | quote }}
   dnsNames:
-    - {{ .Values.certificate.commonName | quote -}}
-    {{/* This will add DNS names for each of the pods for direct access */}}
+    {{- if .Values.certificate.dnsNames }}
+    {{/* Manual override — use exactly what the user provided */}}
+    {{- range .Values.certificate.dnsNames }}
+    - {{ . | quote }}
+    {{- end }}
+    {{- else }}
+    {{/* Auto-generate: commonName + one entry per replica for direct pod access */}}
+    - {{ .Values.certificate.commonName | quote }}
     {{- range $i := until (.Values.replicaCount | int) }}
     - {{ printf "%s-%s-%d.%s" (include "iap.fullname" $) $.Release.Namespace $i $.Values.certificate.domain | quote }}
+    {{- end }}
     {{- end }}
   {{- if or .Values.certificate.ipAddresses .Values.certificate.includeServiceIPs }}
   ipAddresses:

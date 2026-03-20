@@ -19,12 +19,32 @@ spec:
   {{- end }}
   {{- if .Values.ingress.tls }}
   tls:
+    {{- if kindIs "slice" .Values.ingress.tls }}
     {{- range .Values.ingress.tls }}
     - hosts:
+        {{- if .hosts }}
+        {{/* Manual override — use exactly what the user provided */}}
         {{- range .hosts }}
         - {{ . | quote }}
         {{- end }}
+        {{- else }}
+        {{/* Auto-generate from loadBalancer and directAccess configuration */}}
+        {{- include "iap.ingressTLSHosts" $ | nindent 8 }}
+        {{- end }}
       secretName: {{ .secretName }}
+    {{- end }}
+    {{- else }}
+    - hosts:
+        {{- if .Values.ingress.tls.hosts }}
+        {{/* Manual override — use exactly what the user provided */}}
+        {{- range .Values.ingress.tls.hosts }}
+        - {{ . | quote }}
+        {{- end }}
+        {{- else }}
+        {{/* Auto-generate from loadBalancer and directAccess configuration */}}
+        {{- include "iap.ingressTLSHosts" $ | nindent 8 }}
+        {{- end }}
+      secretName: {{ .Values.ingress.tls.secretName }}
     {{- end }}
   {{- end }}
   rules:
