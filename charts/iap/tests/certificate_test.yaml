@@ -247,6 +247,87 @@ tests:
       - exists:
           path: metadata.annotations["helm.sh/template-file"]
 
+  ## dnsNames — auto vs manual
+  - it: should auto-generate dnsNames when dnsNames is empty
+    set:
+      certificate.enabled: true
+      certificate.issuerRef.name: "test-issuer"
+      certificate.issuerRef.kind: "ClusterIssuer"
+      certificate.commonName: "iap.example.com"
+      certificate.domain: "example.com"
+      certificate.renewBefore: "720h"
+      certificate.duration: "2160h"
+      certificate.dnsNames: []
+      replicaCount: 2
+    asserts:
+      - lengthEqual:
+          path: spec.dnsNames
+          count: 3  # commonName + 2 per-replica
+      - contains:
+          path: spec.dnsNames
+          content: "iap.example.com"
+      - matchRegex:
+          path: spec.dnsNames[1]
+          pattern: ".*-NAMESPACE-0\\.example.com"
+      - matchRegex:
+          path: spec.dnsNames[2]
+          pattern: ".*-NAMESPACE-1\\.example.com"
+
+  - it: should use manual dnsNames overriding auto-generation
+    set:
+      certificate.enabled: true
+      certificate.issuerRef.name: "test-issuer"
+      certificate.issuerRef.kind: "ClusterIssuer"
+      certificate.commonName: "iap.example.com"
+      certificate.domain: "example.com"
+      certificate.renewBefore: "720h"
+      certificate.duration: "2160h"
+      certificate.dnsNames:
+        - iap.example.com
+        - cdn.example.com
+        - "*.example.com"
+      replicaCount: 3
+    asserts:
+      - lengthEqual:
+          path: spec.dnsNames
+          count: 3  # only the manually provided entries
+      - contains:
+          path: spec.dnsNames
+          content: "iap.example.com"
+      - contains:
+          path: spec.dnsNames
+          content: "cdn.example.com"
+      - contains:
+          path: spec.dnsNames
+          content: "*.example.com"
+      - notMatchRegex:
+          path: spec.dnsNames[0]
+          pattern: ".*-NAMESPACE-.*"
+
+  - it: should not include per-replica names when dnsNames is manually set
+    set:
+      certificate.enabled: true
+      certificate.issuerRef.name: "test-issuer"
+      certificate.issuerRef.kind: "ClusterIssuer"
+      certificate.commonName: "iap.example.com"
+      certificate.domain: "example.com"
+      certificate.renewBefore: "720h"
+      certificate.duration: "2160h"
+      certificate.dnsNames:
+        - iap.example.com
+        - iap-prod-0.example.com
+      replicaCount: 5
+    asserts:
+      - lengthEqual:
+          path: spec.dnsNames
+          count: 2  # only what the user specified — replicaCount has no effect
+      - contains:
+          path: spec.dnsNames
+          content: "iap.example.com"
+      - contains:
+          path: spec.dnsNames
+          content: "iap-prod-0.example.com"
+
   - it: should render custom annotations
     set:
       certificate.enabled: true
