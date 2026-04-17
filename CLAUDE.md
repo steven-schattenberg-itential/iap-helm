@@ -1,0 +1,285 @@
+# IAP Helm Chart - Claude Context
+
+## Overview
+
+This is the Helm chart for the **Itential Automation Platform (IAP)** — a network automation platform deployed as a Kubernetes StatefulSet. The chart lives in `charts/iap/` and is versioned separately from the repo.
+
+- **Chart version**: 1.9.1
+- **App version**: 6.0.7 (IAP release)
+- **Helm requirement**: v3.15.0+
+- **Chart type**: application
+
+---
+
+## Repository Layout
+
+```
+iap-helm/
+├── charts/iap/               # The Helm chart
+│   ├── Chart.yaml
+│   ├── Chart.lock
+│   ├── values.yaml           # Canonical defaults — the only values file to reference
+│   ├── templates/
+│   │   ├── _helpers.tpl
+│   │   ├── NOTES.txt
+│   │   ├── statefulset.yaml
+│   │   ├── service.yaml
+│   │   ├── service-headless.yaml
+│   │   ├── configmap.yaml
+│   │   ├── configmap-adapter-installer.yaml
+│   │   ├── ingress.yaml
+│   │   ├── issuer.yaml
+│   │   ├── certificate.yaml
+│   │   ├── storage-class.yaml
+│   │   ├── PodMonitor.yaml
+│   │   └── tests/
+│   │       ├── test-post-install.yaml
+│   │       └── test-rbac.yaml
+│   ├── crds/
+│   │   └── monitoring.coreos.com_podmonitors.yaml
+│   └── charts/               # Vendored dependencies
+│       ├── cert-manager-v1.12.3.tgz
+│       └── external-dns-1.17.0.tgz
+├── docs/
+│   ├── helm-tests.md
+│   ├── ingress.md
+│   └── adapter-installer.md
+└── README.md
+```
+
+---
+
+## Chart Dependencies
+
+| Dependency | Version | Condition |
+|---|---|---|
+| cert-manager | 1.12.3 | `certManager.enabled` |
+| external-dns | 1.17.0 | `external-dns.enabled` |
+
+Both are vendored in `charts/iap/charts/` and enabled via feature flags in `values.yaml`.
+
+---
+
+## Core Workload
+
+IAP runs as a **StatefulSet** (`templates/statefulset.yaml`) with:
+
+- `replicaCount: 2` by default
+- Each pod gets a stable DNS name via a headless service
+- Persistent volume claim templates for `/opt/itential/iap/current/platform/adapters` (assets, 20Gi) and `/var/log/itential` (logs, 10Gi)
+
+### Ports
+
+| Name | Container Port | Purpose |
+|---|---|---|
+| `http` | 3443 | Main IAP application (HTTP/HTTPS) |
+| `websocket` | 8080 | WebSocket traffic |
+| `metrics` | 9256 | Process exporter (if sidecar enabled) |
+
+### Probes
+
+- **Startup**: HTTP GET `/health/status` — 180s initial delay, 30s period
+- **Liveness**: `exec` checking for core Pronghorn processes — 90s initial delay, 30s period
+- **Readiness**: HTTP GET `/health/status?exclude-services=true` — 90s initial delay, 30s period
+
+### Security Context
+
+Runs as non-root: `runAsUser: 1001`, `fsGroup: 1001`, `runAsNonRoot: true`, `allowPrivilegeEscalation: false`.
+
+### Resources
+
+Default requests: `cpu: 3`, `memory: 14Gi`. Default limit: `memory: 14Gi`.
+
+---
+
+## Template Helper Functions (`_helpers.tpl`)
+
+| Helper | Purpose |
+|---|---|
+| `iap.name` | Chart name, max 63 chars |
+| `iap.fullname` | Fully qualified app name (release + chart) |
+| `iap.chart` | Chart label with version |
+| `iap.labels` | Standard `app.kubernetes.io/*` + `helm.sh/*` labels |
+| `iap.selectorLabels` | Labels used for pod selection |
+| `iap.annotations` | Common annotations (copyright, license, template file) |
+| `iap.DirectAccessHost` | Generates per-pod hostname for direct ingress access |
+
+---
+
+## Services
+
+### `service.yaml` — Load-Balanced ClusterIP
+
+Single entrypoint for all replicas. Ports:
+- 443 → container 3443 (HTTPS)
+- 8080 → container 8080 (WebSocket, if `useWebSockets: true`)
+
+### `service-headless.yaml` — Per-Pod Services
+
+Generates one headless service per replica (`{service}-headless-0`, `{service}-headless-1`, ...). Used by:
+- Direct ingress access
+- Post-install test job (tests each pod individually)
+- Process exporter metrics scraping
+
+---
+
+## Ingress (`ingress.yaml`)
+
+Two access patterns, both configurable independently:
+
+### Load Balancer Access
+- Single hostname (e.g., `iap.example.com`) routing to all pods
+- WebSocket path (`/ws`) support
+- Controlled by `ingress.loadBalancer.enabled`
+
+### Direct Access
+- One hostname per pod: `{fullname}-{namespace}-{index}.{baseDomain}`
+- Optional `hostOverride` prefix for custom hostnames
+- Includes `/metrics` path for process exporter (if enabled)
+- Controlled by `ingress.directAccess.enabled`
+
+Both support configurable `ingressClassName`, TLS sections, and annotations (for ALB or NGINX).
+
+---
+
+## TLS / Certificate Management
+
+### cert-manager (`issuer.yaml`, `certificate.yaml`)
+
+When `certManager.enabled: true` and `issuer.enabled: true`:
+- Creates a CA-based `Issuer` or `ClusterIssuer` from a named Kubernetes secret
+- Issues a `Certificate` covering the load balancer hostname and all per-pod DNS names
+- Duration: 2160h (90 days), renews 48h before expiry
+- Certificate stored in a Kubernetes secret, mounted into each pod
+
+### Additional TLS Secrets
+
+`additionalTLSSecrets` in values allows mounting extra certificates (client certs, CA bundles) into pods at custom paths.
+
+### Required Secrets
+
+These Kubernetes secrets must exist before install:
+
+| Secret | Contents |
+|---|---|
+| `itential-platform-secrets` | All IAP environment secrets (DB passwords, API keys, etc.) |
+| `iap-ca` | CA certificate for cert-manager issuer |
+| Image pull secret(s) | Named in `imagePullSecrets` |
+
+---
+
+## Adapter Installer Init Container
+
+Controlled by `initAdapterInstaller.enabled: true` + `mountAdapterVolume: true`.
+
+- Runs a Node.js 18 init container before IAP starts
+- Executes a bash script (`configmap-adapter-installer.yaml`) that:
+  - Clones git repos (GitLab, GitHub, Bitbucket) into the adapters volume
+  - Detects branch/tag changes and reinstalls only when needed
+  - Removes adapters no longer in the list
+  - Runs `npm install` with configurable options
+  - Sets permissions (775, itential:users)
+- Pod restarts automatically when the ConfigMap checksum changes (annotation-based)
+
+Repository list format supports both strings (`"https://repo-url"`) and objects with `url`, `branch`/`tag` fields.
+
+---
+
+## Post-Install Tests (`tests/`)
+
+Controlled by `postInstallTests.enabled: true`.
+
+### `test-post-install.yaml`
+- Runs as a Kubernetes Job after `helm install`/`helm upgrade`
+- Creates its own ServiceAccount + RBAC (ClusterRole + ClusterRoleBinding)
+- Tests each pod replica via headless service DNS
+- Validates:
+  1. `/health/status` — apps, adapters, Redis, MongoDB all healthy
+  2. `/version` — matches deployed image tag
+  3. Process count — 14 required core Pronghorn processes + configurable optional list
+- Retries every 15s up to `readinessTimeout` (default 300s)
+- Auto-cleans up after `ttlSecondsAfterFinished` (default 300s)
+
+Run tests: `helm test <release-name> -n <namespace> --logs`
+
+---
+
+## Process Exporter Sidecar
+
+Controlled by `processExporter.enabled: true`.
+
+- Sidecar container scraping process metrics via `/metrics` on port 9256
+- `configmap.yaml` provides `process-exporter.conf` and `web-config.yaml` (TLS for metrics)
+- `PodMonitor.yaml` creates a Prometheus Operator `PodMonitor` CRD resource for scraping
+- Metrics accessible via direct-access ingress `/metrics` path
+
+---
+
+## Storage (`storage-class.yaml`)
+
+Creates a `StorageClass` when `storageClass.enabled: true`:
+- Provisioner and parameters are passed through directly (e.g., AWS EBS GP3, NFS)
+- Reclaim policy: `Retain`
+- Volume binding: `WaitForFirstConsumer`
+- Used by StatefulSet PVC templates for assets and logs volumes
+
+---
+
+## Key values.yaml Sections
+
+| Section | Key Fields | Notes |
+|---|---|---|
+| Root | `replicaCount`, `applicationPort`, `websocketPort`, `useTLS`, `useWebSockets` | Core deployment config |
+| `image` | `repository`, `tag`, `pullPolicy` | IAP container image |
+| `imagePullSecrets` | list of secret names | Must exist in namespace |
+| `initAdapterInstaller` | `enabled`, `repositories`, `npmOptions` | See adapter-installer.md |
+| `postInstallTests` | `enabled`, `readinessTimeout`, `ttlSecondsAfterFinished`, `optionalProcesses` | See helm-tests.md |
+| `certManager` | `enabled` | Toggles cert-manager dependency |
+| `issuer` | `enabled`, `name`, `caSecretName`, `kind` | Issuer or ClusterIssuer |
+| `certificate` | `enabled`, `secretName`, `commonName`, `dnsNames`, `ipAddresses` | SAN/IP config |
+| `ingress` | `loadBalancer.*`, `directAccess.*` | See ingress.md |
+| `storageClass` | `enabled`, `name`, `provisioner`, `parameters` | Storage provisioner |
+| `resources` | `requests`, `limits` | CPU/memory |
+| `env` | 350+ env vars | MongoDB, Redis, Vault, auth, logging, SNMP |
+| `processExporter` | `enabled`, `image`, `config` | Prometheus sidecar |
+| `serviceAccount` | `name` | Optional SA name |
+| `hostAliases` | list | For Redis Sentinel DNS resolution |
+| `nodeSelector`, `tolerations`, `affinity` | standard k8s scheduling | |
+| `additionalTLSSecrets` | list of `{secretName, mountPath}` | Extra cert mounts |
+
+---
+
+## Environment Variables (`.env` section in values.yaml)
+
+IAP is configured almost entirely through environment variables passed to the container. The `env` block in `values.yaml` covers:
+
+- **MongoDB**: `IAPP_DB_URL`, `IAPP_DB_AUTHENTICATION_ENABLED`, `IAPP_DB_SSL_ENABLED`
+- **Redis**: `IAPP_REDIS_PORT`, `IAPP_REDIS_AUTH_ENABLED`, sentinel config
+- **HashiCorp Vault**: `IAPP_VAULT_ENABLED`, read-only integration
+- **Auth**: `IAPP_ENABLE_DEFAULT_USER`, `IAPP_DEFAULT_USER_SESSION_TTL`
+- **Webserver**: `IAPP_HTTPS_ENABLED`, `IAPP_HTTPS_PORT`, CORS, timeouts
+- **Logging**: file rotation, syslog, console log levels
+- **SNMP**: trap configuration
+- **Workers**: task and job worker settings
+
+Sensitive values (passwords, tokens) come from the `itential-platform-secrets` Kubernetes secret via `envFrom`.
+
+---
+
+## NOTES.txt Output
+
+After install, Helm prints:
+- Application URL (HTTP or HTTPS depending on `useTLS`)
+- Per-pod direct access URLs
+- Default admin credentials
+- Summary of configured environment variables
+- Links to Itential documentation
+
+---
+
+## Docs
+
+- [README.md](README.md) — Installation, dependencies, secrets setup, values reference
+- [docs/ingress.md](docs/ingress.md) — ALB vs NGINX, direct access, TLS, annotations
+- [docs/helm-tests.md](docs/helm-tests.md) — Test execution, CI/CD integration, troubleshooting
+- [docs/adapter-installer.md](docs/adapter-installer.md) — Adapter lifecycle, repo config, debugging
