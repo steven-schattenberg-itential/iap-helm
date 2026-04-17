@@ -42,9 +42,6 @@ image:
 # -- The secrets object used to pull the image from the repo
 imagePullSecrets: []
 
-serviceAccount:
-  name:
-
 # The issuer to be used if using cert-manager to generate the TLS certificates
 issuer:
   # -- Toggle to use the issuer object or not

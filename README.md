@@ -191,6 +191,7 @@ understand.
 | processExporter.port | int | `9256` | Process exporter metrics port |
 | replicaCount | int | `2` | The number of pods to start |
 | securityContext | object | `{}` | Additional security context |
+| serviceAccount.name | string | `""` | The name of the service account to assign to the StatefulSet pods. When set, the pod will use this service account for RBAC and IAM role bindings (e.g. IRSA on AWS). When left empty, Kubernetes will use the default service account in the namespace. |
 | service.name | string | `"iap-service"` | The name of this Kubernetes service object. |
 | service.port | int | `443` | The port that this service object is listening on. |
 | service.type | string | `"ClusterIP"` | The service type. |

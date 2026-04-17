@@ -1,4 +1,15 @@
 {{- if .Values.ingress.enabled -}}
+{{/* Build a list of TLS entries */}}
+{{- $tlsList := list -}}
+{{- if .Values.ingress.tls -}}
+  {{- if kindIs "slice" .Values.ingress.tls -}}
+    {{- range .Values.ingress.tls -}}
+      {{- $tlsList = append $tlsList (dict "secretName" .secretName "hosts" (.hosts | default list)) -}}
+    {{- end -}}
+  {{- else -}}
+    {{- $tlsList = append $tlsList (dict "secretName" .Values.ingress.tls.secretName "hosts" (.Values.ingress.tls.hosts | default list)) -}}
+  {{- end -}}
+{{- end -}}
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -17,12 +28,16 @@ spec:
   {{- if .Values.ingress.className }}
   ingressClassName: {{ .Values.ingress.className }}
   {{- end }}
-  {{- if .Values.ingress.tls }}
+  {{- if $tlsList }}
   tls:
-    {{- range .Values.ingress.tls }}
+    {{- range $tlsList }}
     - hosts:
+        {{- if .hosts }}
         {{- range .hosts }}
         - {{ . | quote }}
+        {{- end }}
+        {{- else }}
+        {{- include "iap.ingressTLSHosts" $ | trim | nindent 8 }}
         {{- end }}
       secretName: {{ .secretName }}
     {{- end }}
