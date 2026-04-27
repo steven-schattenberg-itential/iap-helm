@@ -152,9 +152,12 @@ ingress:
     haproxy.org/timeout-server: "300s"
     # WebSocket tunnel timeout — keep alive for long-lived WebSocket connections
     haproxy.org/timeout-tunnel: "3600s"
-    # Health check path for backend IAP pods
+    # TCP health check for backend IAP pods — do not use haproxy.org/check-http here.
+    # check-http applies to every backend in the Ingress, including the /ws WebSocket backend
+    # on port 8080. The WebSocket server does not respond to HTTP GETs, so an HTTP health check
+    # causes HAProxy to mark that backend as DOWN and return 503 for WebSocket connections.
+    # Using check alone falls back to a TCP health check, which works for both backends.
     haproxy.org/check: "true"
-    haproxy.org/check-http: "/health/status?exclude-services=true"
   tls:
     secretName: iap-tls-secret
 ```
