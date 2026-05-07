@@ -169,7 +169,7 @@ understand.
 | ingress.loadBalancer.enabled | bool | `true` | Enable a load balancer that will distribute request to all Itential pods |
 | ingress.loadBalancer.host | string | `"iap.pet-sbx.itential.io"` | The Load balancer host name |
 | ingress.loadBalancer.path | string | `"/"` | The path |
-| ingress.name | string | `"iap-ingress"` | The name of this Kubernetes ingress object |
+| ingress.name | string | `""` | The name of this Kubernetes ingress object. Defaults to `<fullname>-ingress` when not set. |
 | ingress.pathType | string | `"Prefix"` | The ingress controller path type |
 | issuer.caSecretName | string | `nil` | The CA secret to be used by this issuer when creating TLS certificates. |
 | issuer.enabled | bool | `true` | Toggle to use the issuer object or not |

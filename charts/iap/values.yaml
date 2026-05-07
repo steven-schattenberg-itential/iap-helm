@@ -217,8 +217,8 @@ service:
 ingress:
   # -- The ingress object can be disabled and will not be created with this set to false
   enabled: true
-  # -- The name of this Kubernetes ingress object. 
-  name: "iap-ingress"
+  # -- The name of this Kubernetes ingress object. Defaults to {{ fullname }}-ingress if not set.
+  name: ""
   # -- The ingress controller class name tells Kubernetes which ingress controller should 
   # -- handle this ingress object. If left empty, the cluster's default IngressClass
   # -- (if configured) will be used.
