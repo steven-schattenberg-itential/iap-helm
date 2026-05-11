@@ -23,6 +23,7 @@ iap-helm/
 │   │   ├── _helpers.tpl
 │   │   ├── NOTES.txt
 │   │   ├── statefulset.yaml
+│   │   ├── serviceaccount.yaml
 │   │   ├── service.yaml
 │   │   ├── service-headless.yaml
 │   │   ├── configmap.yaml
@@ -242,7 +243,7 @@ Creates a `StorageClass` when `storageClass.enabled: true`:
 | `resources` | `requests`, `limits` | CPU/memory |
 | `env` | 350+ env vars | MongoDB, Redis, Vault, auth, logging, SNMP |
 | `processExporter` | `enabled`, `image`, `config` | Prometheus sidecar |
-| `serviceAccount` | `name` | Optional SA name |
+| `serviceAccount` | `create`, `name`, `annotations`, `automountServiceAccountToken` | SA creation + cloud IAM federation (IRSA/Workload Identity) |
 | `hostAliases` | list | For Redis Sentinel DNS resolution |
 | `nodeSelector`, `tolerations`, `affinity` | standard k8s scheduling | |
 | `additionalTLSSecrets` | list of `{secretName, mountPath}` | Extra cert mounts |

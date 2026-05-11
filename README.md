@@ -191,7 +191,10 @@ understand.
 | processExporter.port | int | `9256` | Process exporter metrics port |
 | replicaCount | int | `2` | The number of pods to start |
 | securityContext | object | `{}` | Additional security context |
-| serviceAccount.name | string | `""` | The name of the service account to assign to the StatefulSet pods. When set, the pod will use this service account for RBAC and IAM role bindings (e.g. IRSA on AWS). When left empty, Kubernetes will use the default service account in the namespace. |
+| serviceAccount.create | bool | `false` | When true, the chart creates the ServiceAccount. When false, the pod uses whatever `serviceAccount.name` is set to, or the namespace default SA if empty. |
+| serviceAccount.name | string | `""` | The name of the ServiceAccount to assign to pods. When left empty and `create` is false, Kubernetes uses the namespace default SA. |
+| serviceAccount.annotations | object | `{}` | Annotations added to the ServiceAccount. Used for cloud IAM federation: AWS EKS IRSA (`eks.amazonaws.com/role-arn`), GCP Workload Identity (`iam.gke.io/gcp-service-account`), Azure Workload Identity (`azure.workload.identity/client-id`). |
+| serviceAccount.automountServiceAccountToken | bool | `false` | Controls whether pods automount the SA token. Set to `true` when using IRSA or Workload Identity. |
 | service.name | string | `"iap-service"` | The name of this Kubernetes service object. |
 | service.port | int | `443` | The port that this service object is listening on. |
 | service.type | string | `"ClusterIP"` | The service type. |

@@ -98,10 +98,21 @@ image:
 imagePullSecrets: []
 
 serviceAccount:
+  # -- When true, the chart creates the ServiceAccount. When false, the pod uses whatever name is set
+  # -- (or the namespace default SA if name is empty). Set to false for environments that manage SAs externally.
+  create: false
   # -- The name of the service account to assign to the StatefulSet pods.
-  # -- When set, the pod will use this service account for RBAC and IAM role bindings (e.g. IRSA on AWS).
-  # -- When left empty, Kubernetes will use the default service account in the namespace.
+  # -- When set, the pod will use this service account for RBAC and IAM role bindings (e.g. IRSA on AWS EKS,
+  # -- Workload Identity on GKE, Workload Identity on AKS). When left empty, Kubernetes will use the
+  # -- default service account in the namespace.
   name: ""
+  # -- Annotations to add to the ServiceAccount. Used for cloud IAM federation:
+  # -- AWS EKS IRSA:  eks.amazonaws.com/role-arn: "arn:aws:iam::<account>:role/<role>"
+  # -- GCP GKE:       iam.gke.io/gcp-service-account: "<sa>@<project>.iam.gserviceaccount.com"
+  # -- Azure AKS:     azure.workload.identity/client-id: "<client-id>"
+  annotations: {}
+  # -- Controls whether the pod automounts the SA token. Set to true when using IRSA or Workload Identity.
+  automountServiceAccountToken: false
 
 # The issuer to be used if using cert-manager to generate the TLS certificates
 issuer:

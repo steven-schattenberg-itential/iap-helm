@@ -1083,6 +1083,35 @@ tests:
           path: spec.template.spec.serviceAccountName
           value: "my-service-account"
 
+  - it: should set serviceAccountName when create is true with a named account
+    set:
+      statefulset.enabled: true
+      replicaCount: 1
+      image:
+        repository: "test/app"
+        tag: "v1.0.0"
+        pullPolicy: "IfNotPresent"
+      service:
+        port: 80
+      applicationPort: 8080
+      useTLS: false
+      podSecurityContext: {}
+      securityContext: {}
+      persistentVolumeClaims:
+        enabled: false
+      processExporter:
+        enabled: false
+      serviceAccount:
+        create: true
+        name: "iap-serviceaccount"
+        annotations:
+          eks.amazonaws.com/role-arn: "arn:aws:iam::123456789012:role/IAP-ElastiCache-Role"
+        automountServiceAccountToken: true
+    asserts:
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: "iap-serviceaccount"
+
   # Additional TLS Secrets Integration Tests
   - it: should handle additionalTLSSecrets in StatefulSet
     set:
