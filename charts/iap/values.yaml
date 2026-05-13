@@ -103,8 +103,8 @@ serviceAccount:
   create: false
   # -- The name of the service account to assign to the StatefulSet pods.
   # -- When set, the pod will use this service account for RBAC and IAM role bindings (e.g. IRSA on AWS EKS,
-  # -- Workload Identity on GKE, Workload Identity on AKS). When left empty, Kubernetes will use the
-  # -- default service account in the namespace.
+  # -- Workload Identity on GKE, Workload Identity on AKS). When create is true and name is empty, the chart
+  # -- uses the release fullname. When create is false and name is empty, Kubernetes uses the namespace default SA.
   name: ""
   # -- Annotations to add to the ServiceAccount. Used for cloud IAM federation:
   # -- AWS EKS IRSA:  eks.amazonaws.com/role-arn: "arn:aws:iam::<account>:role/<role>"

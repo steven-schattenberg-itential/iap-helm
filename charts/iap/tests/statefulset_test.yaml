@@ -1112,6 +1112,34 @@ tests:
           path: spec.template.spec.serviceAccountName
           value: "iap-serviceaccount"
 
+  - it: should fall back to fullname when create is true and name is empty
+    set:
+      statefulset.enabled: true
+      replicaCount: 1
+      image:
+        repository: "test/app"
+        tag: "v1.0.0"
+        pullPolicy: "IfNotPresent"
+      service:
+        port: 80
+      applicationPort: 8080
+      useTLS: false
+      podSecurityContext: {}
+      securityContext: {}
+      persistentVolumeClaims:
+        enabled: false
+      processExporter:
+        enabled: false
+      serviceAccount:
+        create: true
+        name: ""
+        annotations: {}
+        automountServiceAccountToken: false
+    asserts:
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: "RELEASE-NAME-iap"
+
   # Additional TLS Secrets Integration Tests
   - it: should handle additionalTLSSecrets in StatefulSet
     set:

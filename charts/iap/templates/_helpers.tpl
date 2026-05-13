@@ -62,6 +62,21 @@ helm.sh/template-file: "{{ $.Template.Name }}"
 {{- end -}}
 
 {{/*
+Compute the effective ServiceAccount name for pods and the SA resource.
+When create is true and name is empty, falls back to the fullname so the
+created SA and the pod spec always reference the same name.
+When create is false and name is empty, returns "" so Kubernetes uses the
+namespace default SA.
+*/}}
+{{- define "iap.serviceAccountName" -}}
+{{- if .Values.serviceAccount.create -}}
+{{- .Values.serviceAccount.name | default (include "iap.fullname" .) -}}
+{{- else -}}
+{{- .Values.serviceAccount.name -}}
+{{- end -}}
+{{- end }}
+
+{{/*
 Direct host names
 */}}
 {{- define "iap.DirectAccessHost" -}}
