@@ -30,6 +30,7 @@ iap-helm/
 │   │   ├── ingress.yaml
 │   │   ├── issuer.yaml
 │   │   ├── certificate.yaml
+│   │   ├── serviceaccount.yaml
 │   │   ├── storage-class.yaml
 │   │   ├── PodMonitor.yaml
 │   │   └── tests/
@@ -102,6 +103,8 @@ Default requests: `cpu: 3`, `memory: 14Gi`. Default limit: `memory: 14Gi`.
 | `iap.labels` | Standard `app.kubernetes.io/*` + `helm.sh/*` labels |
 | `iap.selectorLabels` | Labels used for pod selection |
 | `iap.annotations` | Common annotations (copyright, license, template file) |
+| `iap.serviceAccountName` | Effective SA name — falls back to fullname when `create: true` and `name` is empty |
+| `iap.ingressTLSHosts` | Full TLS hostname list (load balancer + per-pod direct access) for ingress |
 | `iap.DirectAccessHost` | Generates per-pod hostname for direct ingress access |
 
 ---
@@ -242,7 +245,7 @@ Creates a `StorageClass` when `storageClass.enabled: true`:
 | `resources` | `requests`, `limits` | CPU/memory |
 | `env` | 350+ env vars | MongoDB, Redis, Vault, auth, logging, SNMP |
 | `processExporter` | `enabled`, `image`, `config` | Prometheus sidecar |
-| `serviceAccount` | `name` | Optional SA name |
+| `serviceAccount` | `create`, `name`, `annotations`, `automountServiceAccountToken` | SA creation + cloud IAM federation (IRSA/Workload Identity) |
 | `hostAliases` | list | For Redis Sentinel DNS resolution |
 | `nodeSelector`, `tolerations`, `affinity` | standard k8s scheduling | |
 | `additionalTLSSecrets` | list of `{secretName, mountPath}` | Extra cert mounts |
@@ -274,6 +277,42 @@ After install, Helm prints:
 - Default admin credentials
 - Summary of configured environment variables
 - Links to Itential documentation
+
+---
+
+## Unit Tests (`charts/iap/tests/`)
+
+The chart uses [helm-unittest](https://github.com/helm-unittest/helm-unittest). Test files live in `charts/iap/tests/*_test.yaml`.
+
+- Run: `helm unittest charts/iap`
+- Test release name resolves to `RELEASE-NAME`, namespace to `NAMESPACE`
+- `iap.fullname` renders as `RELEASE-NAME-iap` in test assertions
+- Each template has a corresponding `<template-name>_test.yaml`; add tests whenever a template changes
+
+---
+
+## Template Conventions
+
+Every resource template must follow this pattern for labels and annotations.
+
+**Labels** — always include both:
+```yaml
+labels:
+  {{- include "iap.labels" . | nindent 4 }}
+  app.kubernetes.io/component: "<resource-type>"
+```
+
+**Annotations** — always unconditional (never wrap the whole block in `{{- with }}`):
+```yaml
+annotations:
+  kubernetes.io/description: "Itential Automation Platform <resource-type>."
+  {{- include "iap.annotations" . | nindent 4 }}
+  {{- with .Values.<section>.annotations }}
+  {{- toYaml . | nindent 4 }}
+  {{- end }}
+```
+
+When the same computed value is needed in more than one template, extract it to `_helpers.tpl`.
 
 ---
 
