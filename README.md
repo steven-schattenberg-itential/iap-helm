@@ -192,7 +192,7 @@ understand.
 | replicaCount | int | `2` | The number of pods to start |
 | securityContext | object | `{}` | Additional security context |
 | serviceAccount.create | bool | `false` | When true, the chart creates the ServiceAccount. When false, the pod uses whatever `serviceAccount.name` is set to, or the namespace default SA if empty. |
-| serviceAccount.name | string | `""` | The name of the ServiceAccount to assign to pods. When left empty and `create` is false, Kubernetes uses the namespace default SA. |
+| serviceAccount.name | string | `""` | The name of the ServiceAccount to assign to pods. When `create` is true and name is empty, the chart falls back to the release fullname. When `create` is false and name is empty, Kubernetes uses the namespace default SA. |
 | serviceAccount.annotations | object | `{}` | Annotations added to the ServiceAccount. Used for cloud IAM federation: AWS EKS IRSA (`eks.amazonaws.com/role-arn`), GCP Workload Identity (`iam.gke.io/gcp-service-account`), Azure Workload Identity (`azure.workload.identity/client-id`). |
 | serviceAccount.automountServiceAccountToken | bool | `false` | Controls whether pods automount the SA token. Set to `true` when using IRSA or Workload Identity. |
 | service.name | string | `"iap-service"` | The name of this Kubernetes service object. |
