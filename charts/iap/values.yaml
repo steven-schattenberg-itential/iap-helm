@@ -75,9 +75,12 @@ postInstallTests:
       - "Pronghorn_AppArtifacts_Application"
 
 certManager:
-  # -- Toggles the use of cert-manager for managing the TLS certificates. Setting this to false
-  # means that creation of the TLS certificates will be manual and outside of the chart.
-  enabled: true
+  # -- Toggles installation of cert-manager as a chart dependency. Defaults to false because most
+  # enterprise clusters run a shared, cluster-wide cert-manager managed by the platform team.
+  # Set to true only in dev or test environments where no cluster-wide cert-manager is available.
+  # If enabled, always install with --atomic (e.g. helm install --atomic --timeout 10m) to surface
+  # the cert-manager webhook race condition as a hard failure rather than a silent partial deploy.
+  enabled: false
 
 external-dns:
   # -- Optional dependency to generate a static external DNS name
