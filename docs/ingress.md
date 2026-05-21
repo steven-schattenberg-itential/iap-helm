@@ -372,6 +372,21 @@ ingress:
 
 Both access methods support TLS termination. Configure certificates using cert-manager or manually.
 
+**Recommended: cluster-wide cert-manager.** Most enterprise environments run a shared cert-manager
+instance managed by the platform team. Leave `certManager.enabled: false` (the default) and
+reference it via the `issuer` and `certificate` values in your values file.
+
+**Dev and test only: chart-managed cert-manager.** If no cluster-wide cert-manager is available,
+set `certManager.enabled: true`. In this mode, use `--atomic` on every install and upgrade:
+
+```bash
+helm install iap ./charts/iap --atomic --timeout 10m -f values.yaml
+```
+
+Without `--atomic`, a timing issue between cert-manager's webhook pod becoming ready and the
+webhook being fully initialized can cause the Ingress to be silently rejected while Helm still
+reports `STATUS: deployed`. `--atomic` ensures that outcome is a hard failure instead.
+
 The chart automatically generates the full list of TLS hostnames from your `loadBalancer` and `directAccess` configuration — there is no need to list hosts manually. Only the `secretName` is required:
 
 ```yaml

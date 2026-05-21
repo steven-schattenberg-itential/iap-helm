@@ -67,25 +67,32 @@ provided by the user of the chart in the values file (`issuer.caSecretName`) if 
 
 #### Certificates
 
-The chart will require a Certificate Authority to be added to the Kubernetes environment. This is
-used by the chart when running with `useTLS` flag enabled. The chart will use this CA to generate
-the necessary certificates using a Kubernetes `Issuer` which is included. The Issuer will issue the
-certificates using the CA. The certificates are then included using a Kubernetes `Secret` which is
-mounted by the pods. Creating and adding this CA is outside of the scope of this chart.
+The chart uses [cert-manager](https://cert-manager.io/) to issue TLS certificates from a CA you
+provide. It creates a Kubernetes `Issuer` and `Certificate` object; cert-manager does the rest.
 
-Both the `Issuer` and the `Certificate` objects are realized by using the widely used Kubernetes
-add-on called `cert-manager`. Cert-manager is responsible for making the TLS certificates required
-by using the CA that was installed separately. The installation of cert-manager is outside the scope
-of this chart. To check if this is already installed run this command:
+**Recommended: use a cluster-wide cert-manager.** In most enterprise environments, cert-manager is
+a shared cluster service managed by the platform team. Leave `certManager.enabled: false` (the
+default) and point the chart at your existing cert-manager installation by configuring the `issuer`
+and `certificate` values. To verify cert-manager is available:
 
 ```bash
 kubectl get crds | grep cert-manager
 ```
 
-For more information see the [Cert Manager project](https://cert-manager.io/).
+**Dev and test only: chart-managed cert-manager.** If no cluster-wide cert-manager is available,
+set `certManager.enabled: true` to install cert-manager as a chart dependency. In this mode,
+always install with `--atomic` to surface the cert-manager webhook race condition as a hard failure
+rather than a silent partial deploy:
 
-If `cert-manager` can not be used then the TLS certificates must be manually added to the Kubernetes
-cluster. The Helm templates expect them to be in a secret named `<Chart.name>-tls-secret` by default,
+```bash
+helm install iap ./charts/iap --atomic --timeout 10m -f values.yaml
+```
+
+Without `--atomic`, Helm can report `STATUS: deployed` even when the Ingress was never created,
+because the cert-manager admission webhook is not yet ready when Helm submits resources.
+
+If cert-manager is not available and cannot be installed, TLS certificates must be manually added to
+the cluster. The Helm templates expect them in a secret named `<Chart.name>-tls-secret` by default,
 or a custom name specified by `certificate.secretName` in values.yaml. The secret expects the following keys:
 
 | Key | Description |
