@@ -152,9 +152,12 @@ ingress:
     haproxy.org/timeout-server: "300s"
     # WebSocket tunnel timeout — keep alive for long-lived WebSocket connections
     haproxy.org/timeout-tunnel: "3600s"
-    # Health check path for backend IAP pods
+    # TCP health check for backend IAP pods — do not use haproxy.org/check-http here.
+    # check-http applies to every backend in the Ingress, including the /ws WebSocket backend
+    # on port 8080. The WebSocket server does not respond to HTTP GETs, so an HTTP health check
+    # causes HAProxy to mark that backend as DOWN and return 503 for WebSocket connections.
+    # Using check alone falls back to a TCP health check, which works for both backends.
     haproxy.org/check: "true"
-    haproxy.org/check-http: "/health/status?exclude-services=true"
   tls:
     secretName: iap-tls-secret
 ```
@@ -368,6 +371,21 @@ ingress:
 ## TLS Configuration
 
 Both access methods support TLS termination. Configure certificates using cert-manager or manually.
+
+**Recommended: cluster-wide cert-manager.** Most enterprise environments run a shared cert-manager
+instance managed by the platform team. Leave `certManager.enabled: false` (the default) and
+reference it via the `issuer` and `certificate` values in your values file.
+
+**Dev and test only: chart-managed cert-manager.** If no cluster-wide cert-manager is available,
+set `certManager.enabled: true`. In this mode, use `--atomic` on every install and upgrade:
+
+```bash
+helm install iap ./charts/iap --atomic --timeout 10m -f values.yaml
+```
+
+Without `--atomic`, a timing issue between cert-manager's webhook pod becoming ready and the
+webhook being fully initialized can cause the Ingress to be silently rejected while Helm still
+reports `STATUS: deployed`. `--atomic` ensures that outcome is a hard failure instead.
 
 The chart automatically generates the full list of TLS hostnames from your `loadBalancer` and `directAccess` configuration — there is no need to list hosts manually. Only the `secretName` is required:
 

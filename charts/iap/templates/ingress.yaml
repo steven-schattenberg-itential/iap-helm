@@ -14,7 +14,7 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ include "iap.fullname" . }}-ingress
+  name: {{ .Values.ingress.name | default (printf "%s-ingress" (include "iap.fullname" .)) }}
   labels:
     {{- include "iap.labels" . | nindent 4 }}
     app.kubernetes.io/component: "ingress"

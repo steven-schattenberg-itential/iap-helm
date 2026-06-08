@@ -33,6 +33,24 @@ tests:
           path: metadata.name
           value: RELEASE-NAME-iap-ingress
 
+  - it: should use custom ingress.name when set
+    set:
+      ingress:
+        enabled: true
+        name: "my-custom-ingress"
+        loadBalancer:
+          enabled: true
+          host: test.example.com
+        directAccess:
+          enabled: false
+      service:
+        port: 443
+      replicaCount: 1
+    asserts:
+      - equal:
+          path: metadata.name
+          value: "my-custom-ingress"
+
   - it: should have correct API version and kind
     set:
       ingress:

@@ -67,25 +67,32 @@ provided by the user of the chart in the values file (`issuer.caSecretName`) if 
 
 #### Certificates
 
-The chart will require a Certificate Authority to be added to the Kubernetes environment. This is
-used by the chart when running with `useTLS` flag enabled. The chart will use this CA to generate
-the necessary certificates using a Kubernetes `Issuer` which is included. The Issuer will issue the
-certificates using the CA. The certificates are then included using a Kubernetes `Secret` which is
-mounted by the pods. Creating and adding this CA is outside of the scope of this chart.
+The chart uses [cert-manager](https://cert-manager.io/) to issue TLS certificates from a CA you
+provide. It creates a Kubernetes `Issuer` and `Certificate` object; cert-manager does the rest.
 
-Both the `Issuer` and the `Certificate` objects are realized by using the widely used Kubernetes
-add-on called `cert-manager`. Cert-manager is responsible for making the TLS certificates required
-by using the CA that was installed separately. The installation of cert-manager is outside the scope
-of this chart. To check if this is already installed run this command:
+**Recommended: use a cluster-wide cert-manager.** In most enterprise environments, cert-manager is
+a shared cluster service managed by the platform team. Leave `certManager.enabled: false` (the
+default) and point the chart at your existing cert-manager installation by configuring the `issuer`
+and `certificate` values. To verify cert-manager is available:
 
 ```bash
 kubectl get crds | grep cert-manager
 ```
 
-For more information see the [Cert Manager project](https://cert-manager.io/).
+**Dev and test only: chart-managed cert-manager.** If no cluster-wide cert-manager is available,
+set `certManager.enabled: true` to install cert-manager as a chart dependency. In this mode,
+always install with `--atomic` to surface the cert-manager webhook race condition as a hard failure
+rather than a silent partial deploy:
 
-If `cert-manager` can not be used then the TLS certificates must be manually added to the Kubernetes
-cluster. The Helm templates expect them to be in a secret named `<Chart.name>-tls-secret` by default,
+```bash
+helm install iap ./charts/iap --atomic --timeout 10m -f values.yaml
+```
+
+Without `--atomic`, Helm can report `STATUS: deployed` even when the Ingress was never created,
+because the cert-manager admission webhook is not yet ready when Helm submits resources.
+
+If cert-manager is not available and cannot be installed, TLS certificates must be manually added to
+the cluster. The Helm templates expect them in a secret named `<Chart.name>-tls-secret` by default,
 or a custom name specified by `certificate.secretName` in values.yaml. The secret expects the following keys:
 
 | Key | Description |
@@ -169,7 +176,7 @@ understand.
 | ingress.loadBalancer.enabled | bool | `true` | Enable a load balancer that will distribute request to all Itential pods |
 | ingress.loadBalancer.host | string | `"iap.pet-sbx.itential.io"` | The Load balancer host name |
 | ingress.loadBalancer.path | string | `"/"` | The path |
-| ingress.name | string | `"iap-ingress"` | The name of this Kubernetes ingress object |
+| ingress.name | string | `""` | The name of this Kubernetes ingress object. Defaults to `<fullname>-ingress` when not set. |
 | ingress.pathType | string | `"Prefix"` | The ingress controller path type |
 | issuer.caSecretName | string | `nil` | The CA secret to be used by this issuer when creating TLS certificates. |
 | issuer.enabled | bool | `true` | Toggle to use the issuer object or not |
@@ -191,7 +198,10 @@ understand.
 | processExporter.port | int | `9256` | Process exporter metrics port |
 | replicaCount | int | `2` | The number of pods to start |
 | securityContext | object | `{}` | Additional security context |
-| serviceAccount.name | string | `""` | The name of the service account to assign to the StatefulSet pods. When set, the pod will use this service account for RBAC and IAM role bindings (e.g. IRSA on AWS). When left empty, Kubernetes will use the default service account in the namespace. |
+| serviceAccount.create | bool | `false` | When true, the chart creates the ServiceAccount. When false, the pod uses whatever `serviceAccount.name` is set to, or the namespace default SA if empty. |
+| serviceAccount.name | string | `""` | The name of the ServiceAccount to assign to pods. When `create` is true and name is empty, the chart falls back to the release fullname. When `create` is false and name is empty, Kubernetes uses the namespace default SA. |
+| serviceAccount.annotations | object | `{}` | Annotations added to the ServiceAccount. Used for cloud IAM federation: AWS EKS IRSA (`eks.amazonaws.com/role-arn`), GCP Workload Identity (`iam.gke.io/gcp-service-account`), Azure Workload Identity (`azure.workload.identity/client-id`). |
+| serviceAccount.automountServiceAccountToken | bool | `false` | Controls whether pods automount the SA token. Set to `true` when using IRSA or Workload Identity. |
 | service.name | string | `"iap-service"` | The name of this Kubernetes service object. |
 | service.port | int | `443` | The port that this service object is listening on. |
 | service.type | string | `"ClusterIP"` | The service type. |

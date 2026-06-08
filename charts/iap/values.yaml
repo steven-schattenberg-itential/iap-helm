@@ -75,9 +75,12 @@ postInstallTests:
       - "Pronghorn_AppArtifacts_Application"
 
 certManager:
-  # -- Toggles the use of cert-manager for managing the TLS certificates. Setting this to false
-  # means that creation of the TLS certificates will be manual and outside of the chart.
-  enabled: true
+  # -- Toggles installation of cert-manager as a chart dependency. Defaults to false because most
+  # enterprise clusters run a shared, cluster-wide cert-manager managed by the platform team.
+  # Set to true only in dev or test environments where no cluster-wide cert-manager is available.
+  # If enabled, always install with --atomic (e.g. helm install --atomic --timeout 10m) to surface
+  # the cert-manager webhook race condition as a hard failure rather than a silent partial deploy.
+  enabled: false
 
 external-dns:
   # -- Optional dependency to generate a static external DNS name
@@ -98,10 +101,21 @@ image:
 imagePullSecrets: []
 
 serviceAccount:
+  # -- When true, the chart creates the ServiceAccount. When false, the pod uses whatever name is set
+  # -- (or the namespace default SA if name is empty). Set to false for environments that manage SAs externally.
+  create: false
   # -- The name of the service account to assign to the StatefulSet pods.
-  # -- When set, the pod will use this service account for RBAC and IAM role bindings (e.g. IRSA on AWS).
-  # -- When left empty, Kubernetes will use the default service account in the namespace.
+  # -- When set, the pod will use this service account for RBAC and IAM role bindings (e.g. IRSA on AWS EKS,
+  # -- Workload Identity on GKE, Workload Identity on AKS). When create is true and name is empty, the chart
+  # -- uses the release fullname. When create is false and name is empty, Kubernetes uses the namespace default SA.
   name: ""
+  # -- Annotations to add to the ServiceAccount. Used for cloud IAM federation:
+  # -- AWS EKS IRSA:  eks.amazonaws.com/role-arn: "arn:aws:iam::<account>:role/<role>"
+  # -- GCP GKE:       iam.gke.io/gcp-service-account: "<sa>@<project>.iam.gserviceaccount.com"
+  # -- Azure AKS:     azure.workload.identity/client-id: "<client-id>"
+  annotations: {}
+  # -- Controls whether the pod automounts the SA token. Set to true when using IRSA or Workload Identity.
+  automountServiceAccountToken: false
 
 # The issuer to be used if using cert-manager to generate the TLS certificates
 issuer:
@@ -217,8 +231,8 @@ service:
 ingress:
   # -- The ingress object can be disabled and will not be created with this set to false
   enabled: true
-  # -- The name of this Kubernetes ingress object. 
-  name: "iap-ingress"
+  # -- The name of this Kubernetes ingress object. Defaults to {{ fullname }}-ingress if not set.
+  name: ""
   # -- The ingress controller class name tells Kubernetes which ingress controller should 
   # -- handle this ingress object. If left empty, the cluster's default IngressClass
   # -- (if configured) will be used.
