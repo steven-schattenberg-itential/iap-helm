@@ -11,6 +11,7 @@ tests:
         type: "ClusterIP"
         port: 80
       applicationPort: 8080
+      useTLS: false
       useWebSockets: false
     asserts:
       - hasDocuments:
@@ -163,6 +164,7 @@ tests:
         type: "ClusterIP"
         port: 80
       applicationPort: 80
+      useTLS: false
       useWebSockets: false
     asserts:
       - equal:
@@ -182,6 +184,7 @@ tests:
         type: "ClusterIP"
         port: 443
       applicationPort: 8443
+      useTLS: false
       useWebSockets: false
     asserts:
       - equal:
@@ -230,6 +233,7 @@ tests:
         type: "ClusterIP"
         port: 9999
       applicationPort: 8888
+      useTLS: false
       useWebSockets: false
     asserts:
       - equal:
@@ -398,6 +402,7 @@ tests:
         type: "ClusterIP"
         port: 443
       applicationPort: 3443
+      useTLS: false
       useWebSockets: true
       websocketPort: 8080
     asserts:
